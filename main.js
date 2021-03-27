@@ -18,6 +18,7 @@ const ctx = canvas.getContext('2d');
  * 11: hold end
  * 12: lane effect
  * 13: lane effect
+ * 14: end of chart
  * 16: chain
  */
 let noteList = [];
@@ -35,13 +36,72 @@ let startedHoldList = {}
 let startedHoldReverseList = {}
 let chartHeader = {}
 
+const arrowCanvas = {
+  in: document.createElement('canvas'),
+  out: document.createElement('canvas'),
+  left: document.createElement('canvas'),
+  right: document.createElement('canvas'),
+}
+function createArrows() {
+  arrowCanvas.in.width = maxR*2, arrowCanvas.in.height = maxR*2
+  arrowCanvas.out.width = maxR*2, arrowCanvas.out.height = maxR*2
+  arrowCanvas.left.width = maxR*2, arrowCanvas.left.height = maxR*2
+  arrowCanvas.right.width = maxR*2, arrowCanvas.right.height = maxR*2
+  const ctx = {
+    in: arrowCanvas.in.getContext('2d'),
+    out: arrowCanvas.out.getContext('2d'),
+    left: arrowCanvas.left.getContext('2d'),
+    right: arrowCanvas.right.getContext('2d'),
+  }
+
+  ctx.in.translate(maxR, maxR); ctx.in.rotate(Math.PI / 2); ctx.in.translate(-maxR, -maxR)
+  for (let i = 0; i < 30; i++) {
+    ctx.in.beginPath()
+    ctx.in.arc(maxR, maxR, maxR * 0.95, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
+    ctx.in.arc(maxR, maxR, maxR * 0.85, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
+    ctx.in.arc(maxR, maxR, maxR * 0.95, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
+    ctx.in.strokeStyle = 'black'; ctx.in.lineWidth = 12; ctx.in.stroke()
+    ctx.in.strokeStyle = 'rgb(203,29,25)'; ctx.in.lineWidth = 5; ctx.in.stroke()
+  }
+
+  ctx.out.translate(maxR, maxR); ctx.out.rotate(Math.PI / 2); ctx.out.translate(-maxR, -maxR)
+  for (let i = 0; i < 30; i++) {
+    ctx.out.beginPath()
+    ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
+    ctx.out.arc(maxR, maxR, maxR * 0.95, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
+    ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
+    ctx.out.strokeStyle = 'black'; ctx.out.lineWidth = 12; ctx.out.stroke()
+    ctx.out.strokeStyle = 'rgb(33,180,251)'; ctx.out.lineWidth = 5; ctx.out.stroke()
+  }
+
+  ctx.left.translate(maxR, maxR); ctx.left.rotate(Math.PI / 2); ctx.left.translate(-maxR, -maxR)
+  for (let i = 0; i < 30; i++) {
+    ctx.left.beginPath()
+    ctx.left.arc(maxR, maxR, maxR * 0.85, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
+    ctx.left.arc(maxR, maxR, maxR * 0.90, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
+    ctx.left.arc(maxR, maxR, maxR * 0.95, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
+    ctx.left.strokeStyle = 'black'; ctx.left.lineWidth = 12; ctx.left.stroke()
+    ctx.left.strokeStyle = 'rgb(246,159,55)'; ctx.left.lineWidth = 5; ctx.left.stroke()
+  }
+
+  ctx.right.translate(maxR, maxR); ctx.right.rotate(Math.PI / 2); ctx.right.translate(-maxR, -maxR)
+  for (let i = 0; i < 30; i++) {
+    ctx.right.beginPath()
+    ctx.right.arc(maxR, maxR, maxR * 0.85, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
+    ctx.right.arc(maxR, maxR, maxR * 0.90, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
+    ctx.right.arc(maxR, maxR, maxR * 0.95, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
+    ctx.right.strokeStyle = 'black'; ctx.right.lineWidth = 12; ctx.right.stroke()
+    ctx.right.strokeStyle = 'rgb(98,251,43)'; ctx.right.lineWidth = 5; ctx.right.stroke()
+  }
+}
+
 const enableBga = false
 
 const TICK_PER_GAME_SECTION = 1920;
 const TICK_PER_BEAT = TICK_PER_GAME_SECTION / 4;
 let RENDER_DISTANCE = 750
 
-parseNotesFromFile('MusicData/S00-003/S00-003_02.mer'); setBgm('0.wav')
+//parseNotesFromFile('MusicData/S00-003/S00-003_02.mer'); setBgm('0.wav')
 //parseNotesFromFile('MusicData/S02-085/S02-085_02.mer')
 //parseNotesFromFile('MusicData/S02-225/S02-225_02.mer')
 parseNotesFromFile('MusicData/S02-218/S02-218_02.mer'); setBgm('music001282.wav')
@@ -221,6 +281,12 @@ function parseNotesFromText(text) {noteList = [];
   })
 
   console.log('parsed notes')
+
+  window.noteTypes = {}
+  noteListForPlayback.forEach(i => {
+    if (!window.noteTypes[i.noteType]) window.noteTypes[i.noteType] = []
+    window.noteTypes[i.noteType].push(i)
+  })
 }
 
 const drawCount = {
@@ -322,6 +388,7 @@ function render(now) {
     flickR: [],
     snapIn: [],
     snapOut: [],
+    arrow: [],
     laneEffect: [],
     unknown: []
   }
@@ -330,12 +397,12 @@ function render(now) {
       case 'sectionSep': {notesToRender.sectionSep.push(i); break;}
       case '1': // touch
       case '2': {notesToRender.touch.push(i); break;} // bonus touch
-      case '3': {notesToRender.snapIn.push(i); break;}
-      case '4': {notesToRender.snapOut.push(i); break;}
+      case '3': {notesToRender.arrow.push(i); notesToRender.snapIn.push(i); break;}
+      case '4': {notesToRender.arrow.push(i); notesToRender.snapOut.push(i); break;}
       case '5': // flick L
-      case '6': {notesToRender.flickL.push(i); break;} // flick L with effect
+      case '6': {notesToRender.arrow.push(i); notesToRender.flickL.push(i); break;} // flick L with effect
       case '7': // flick R
-      case '8': {notesToRender.flickR.push(i); break;} // flick R with effect
+      case '8': {notesToRender.arrow.push(i); notesToRender.flickR.push(i); break;} // flick R with effect
       case '9': // hold start
       case '11': {notesToRender.hold.push(i);} // hold end
       case '10': {notesToRender.holdBody.push(i); break;} // hold body
@@ -349,7 +416,7 @@ function render(now) {
     ctx.lineWidth = 1.5
     ctx.strokeStyle = '#555'
     notesToRender.sectionSep.forEach(i => {
-      const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * 0.85, 1.7)
+      const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * 0.85, 1.9)
       ctx.beginPath()
       ctx.arc(
         centerX, centerY,
@@ -387,7 +454,7 @@ function render(now) {
         actualEndWidth = (endWidth - startWidth) * (currentDistance + RENDER_DISTANCE - startDistance) / (endDistance - startDistance) + endWidth
         actualEndDistance = currentDistance + RENDER_DISTANCE
       }
-      const r = maxR * Math.pow(1 - Math.max(actualStartDistance - currentDistance, 0) / RENDER_DISTANCE * 0.85, 1.7)
+      const r = maxR * Math.pow(1 - Math.max(actualStartDistance - currentDistance, 0) / RENDER_DISTANCE * 0.85, 1.9)
       const start = 60 - actualStartOffset - actualStartWidth, end = 60 - actualStartOffset
       ctx.beginPath()
       ctx.arc(
@@ -395,7 +462,7 @@ function render(now) {
         r,
         Math.PI * (start / 30), Math.PI * (end / 30)
       )
-      const r2 = maxR * Math.pow(1 - Math.min(actualEndDistance - currentDistance, RENDER_DISTANCE) / RENDER_DISTANCE * 0.85, 1.7)
+      const r2 = maxR * Math.pow(1 - Math.min(actualEndDistance - currentDistance, RENDER_DISTANCE) / RENDER_DISTANCE * 0.85, 1.9)
       const start2 = 60 - actualEndOffset - actualEndWidth, end2 = 60 - actualEndOffset
       ctx.arc(
         centerX, centerY,
@@ -453,7 +520,7 @@ function render(now) {
     if (notesToRender[key].length) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
-        const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * 0.85, 1.7)
+        const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * 0.85, 1.9)
         ctx.lineWidth = (r * 5 / maxR + 2) * thicc
         const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
         ctx.beginPath()
@@ -466,6 +533,43 @@ function render(now) {
       })
     }
   })
+
+  if (notesToRender.arrow.length) {
+    for (let i=notesToRender.arrow.length-1; i>=0; i--) {
+      const a = notesToRender.arrow[i]
+      const r = maxR * Math.pow(1 - (a.distance - currentDistance) / RENDER_DISTANCE * 0.85, 1.9)
+      const start = 60 - a.laneOffset - a.noteWidth, end = 60 - a.laneOffset
+      ctx.save()
+      ctx.beginPath()
+      ctx.moveTo(centerX, centerY)
+      ctx.arc(
+        centerX, centerY,
+        r,
+        Math.PI * (start / 30), Math.PI * (end / 30)
+      )
+      ctx.moveTo(centerX, centerY)
+      ctx.clip()
+      switch (a.noteType) {
+        case '3': {
+          ctx.drawImage(arrowCanvas.in, centerX-r, centerY-r, r*2, r*2)
+          break
+        }
+        case '4': {
+          ctx.drawImage(arrowCanvas.out, centerX-r, centerY-r, r*2, r*2)
+          break
+        }
+        case '5': case '6': {
+          ctx.drawImage(arrowCanvas.left, centerX-r, centerY-r, r*2, r*2)
+          break
+        }
+        case '7': case '8': {
+          ctx.drawImage(arrowCanvas.right, centerX-r, centerY-r, r*2, r*2)
+          break
+        }
+      }
+      ctx.restore()
+    }
+  }
 }
 window.play = function () {
   startNextFrame = true
@@ -566,6 +670,8 @@ function resize() {
   } else {
     bga.style.display = 'none'
   }
+
+  createArrows()
 }
 window.addEventListener('resize', resize)
 resize();
