@@ -5,7 +5,20 @@ let maxR
 /** @type {CanvasRenderingContext2D} */
 const ctx = canvas.getContext('2d');
 /**
- * 1: tap
+ * 1: touch
+ * 2: bonus touch
+ * 3: snap inward
+ * 4: snap outward
+ * 5: flick left
+ * 6: flick left with circle effect
+ * 7: flick right
+ * 8: flick right with circle effect
+ * 9: hold start
+ * 10: hold step
+ * 11: hold end
+ * 12: lane effect
+ * 13: lane effect
+ * 16: chain
  */
 let noteList = [];
 /**
