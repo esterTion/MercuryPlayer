@@ -36,6 +36,7 @@ let startedHoldReverseList = {}
 let chartHeader = {}
 
 const enableBga = false
+
 const TICK_PER_GAME_SECTION = 1920;
 const TICK_PER_BEAT = TICK_PER_GAME_SECTION / 4;
 let RENDER_DISTANCE = 750
@@ -222,6 +223,19 @@ function parseNotesFromText(text) {noteList = [];
   console.log('parsed notes')
 }
 
+const drawCount = {
+  frame: 0,
+  actualFrame: 0,
+}
+setInterval(() => {
+  stats.textContent = [
+    `frame draw: ${drawCount.frame}`,
+    `frame actual draw: ${drawCount.actualFrame}`,
+  ].join('\n')
+  drawCount.frame = 0
+  drawCount.actualFrame = 0
+}, 1e3)
+
 let startTs = 0
 let startNextFrame = false
 let currentTs = 0
@@ -232,6 +246,7 @@ let sflOffset = 0
 let drawForNextFrame = false
 function render(now) {
   requestAnimationFrame(render)
+  drawCount.frame++
 
   if (!playing) {
     if (!drawForNextFrame) {
@@ -240,6 +255,7 @@ function render(now) {
     drawForNextFrame = false
   }
 
+  drawCount.actualFrame++
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   const centerX = canvas.width / 2, centerY = canvas.height / 2
 
@@ -250,8 +266,7 @@ function render(now) {
   ctx.arc(centerX, centerY, maxR, 0, Math.PI * 2)
   ctx.stroke()
   ctx.fillStyle = 'white'
-  if (enableBga) ctx.drawImage(bga, centerX-maxR, centerY-maxR, maxR*2, maxR*2)
-  else ctx.fill()
+  if (!enableBga) ctx.fill()
   ctx.fillStyle = enableBga ? 'rgba(50,50,50,0.7)' : 'rgba(50,50,50,0.5)'
   ctx.fill()
 
@@ -533,10 +548,24 @@ speed_input.addEventListener('change', e => {
   RENDER_DISTANCE = 3000 / speed
 })
 function resize() {
-  canvas.width = window.innerWidth
-  canvas.height = window.innerHeight
-  maxR = Math.round(Math.min(canvas.width, canvas.height) * 0.45)
+  const w = Math.round(window.innerWidth * devicePixelRatio), h = Math.round(window.innerHeight * devicePixelRatio)
+  canvas.width = w
+  canvas.height = h
+  maxR = Math.round(Math.min(w, h) * 0.45)
   drawForNextFrame = true
+
+  if (enableBga) {
+    const wView = window.innerWidth, hView = window.innerHeight
+    const centerX = wView / 2, centerY = hView / 2
+    const rView = Math.round(Math.min(wView, hView) * 0.45)
+    bga.style.left = (centerX - rView) + 'px'
+    bga.style.top = (centerY - rView) + 'px'
+    bga.style.width = (rView * 2) + 'px'
+    bga.style.height = (rView * 2) + 'px'
+    bga.style.display = 'block'
+  } else {
+    bga.style.display = 'none'
+  }
 }
 window.addEventListener('resize', resize)
 resize();
