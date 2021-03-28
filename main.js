@@ -33,6 +33,9 @@ let noteList = [];
  * 2: bpm
  * 3: met
  * 5: sfl
+ * 6: reverse start
+ * 7: reverse point
+ * 8: reverse end
  */
 let controlList = [];
 let noteListForPlayback = [];
@@ -42,6 +45,7 @@ let prevIdMap = {}
 let startedHoldList = {}
 let startedHoldReverseList = {}
 let chartHeader = {}
+let reverseSection = []
 
 const arrowCanvas = {
   in: document.createElement('canvas'),
@@ -150,6 +154,20 @@ function loadUsingPath() {
   parseNotesFromFile(music_input.value)
   setBgm(bgm_input.value)
 }
+music_select.addEventListener('change', e => {
+  if (!musicTable[music_select.value]) return
+  const music = musicTable[music_select.value]
+  diffi_select.children[0].textContent = `Normal (${music.DifficultyNormalLv}) - ${music.NotesDesignerNormal}`
+  diffi_select.children[1].textContent = `Hard (${music.DifficultyHardLv}) - ${music.NotesDesignerHard}`
+  diffi_select.children[2].textContent = `Expert (${music.DifficultyExtremeLv}) - ${music.NotesDesignerExpert}`
+  if (music.DifficultyInfernoLv == "0") {
+    diffi_select.children[3].setAttribute('disabled', '')
+    diffi_select.children[3].textContent = 'Inferno'
+  } else {
+    diffi_select.children[3].removeAttribute('disabled')
+    diffi_select.children[3].textContent = `Inferno (${music.DifficultyInfernoLv}) - ${music.NotesDesignerInferno}`
+  }
+})
 
 function setBgm(path) {
   bgm.src = path
@@ -170,6 +188,7 @@ function parseNotesFromText(text) {noteList = [];
   startedHoldList = {}
   startedHoldReverseList = {}
   chartHeader = {}
+  reverseSection = []
   const controlDupFix = {}
 
   const lines = text.trim().replace(/ +/g, '\t').split('\n');
@@ -331,6 +350,18 @@ function parseNotesFromText(text) {noteList = [];
     }
   })
 
+  // reverse section
+  const reverseStartList = controlList.filter(i => i.cmdType === '6')
+  const reversePointList = controlList.filter(i => i.cmdType === '7')
+  const reverseEndList = controlList.filter(i => i.cmdType === '8')
+  for (let i=0; i<reverseStartList.length; i++) {
+    reverseSection.push([
+      reverseStartList[i].timestamp,
+      reversePointList[i].timestamp,
+      reverseEndList[i].timestamp,
+    ])
+  }
+
   console.log('parsed notes')
 
   window.noteTypes = {}
@@ -417,7 +448,7 @@ function render(now) {
       }
     }
     if (!(currentTs > sflTsList[sflOffset].timestamp && (sflOffset === sflTsList.length - 1 || currentTs <= sflTsList[sflOffset + 1].timestamp))) {
-      for (sflOffset = 0; sflOffset < sflTsList.length - 2; sflOffset++) {
+      for (sflOffset = 0; sflOffset < sflTsList.length - 1; sflOffset++) {
         if (currentTs > sflTsList[sflOffset].timestamp && currentTs <= sflTsList[sflOffset + 1].timestamp) {
           break;
         }
@@ -425,7 +456,14 @@ function render(now) {
       sfl = sflTsList[sflOffset].sfl
     }
     currentTs = now - startTs
-    currentDistance = (currentTs - sflTsList[sflOffset].timestamp) * sfl + sflTsList[sflOffset].distance
+    let calcBaseTs = currentTs
+    for (let i=0; i<reverseSection.length; i++) {
+      if (calcBaseTs > reverseSection[i][0] && calcBaseTs < reverseSection[i][1]) {
+        calcBaseTs = reverseSection[i][1] + (reverseSection[i][1] - calcBaseTs) * (reverseSection[i][1] - reverseSection[i][0]) / (reverseSection[i][2] - reverseSection[i][1])
+        break
+      }
+    }
+    currentDistance = (calcBaseTs - sflTsList[sflOffset].timestamp) * sfl + sflTsList[sflOffset].distance
   }
   previousTs = now
   const notesToRenderArr = getNotesForDraw(currentDistance)
