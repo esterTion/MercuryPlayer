@@ -131,7 +131,7 @@ fetch('Table/MusicParameterTable.json').then(r=>r.json()).then(r => {
     let title = r[i].MusicMessage, artist = r[i].ArtistMessage
     if (title.length > 15) title = title.substr(0, 10) + '...'
     if (artist.length > 15) artist = artist.substr(0, 10) + '...'
-    option.textContent = `${r[i].AssetDirectory} ${title} - ${artist} (${diffi.join('/')})`
+    option.textContent = `${r[i].AssetDirectory} (${diffi.join('/')}) ${title} - ${artist}`
   })
 }).catch(e => {
   console.error('failed loading music table', e)
@@ -648,6 +648,7 @@ window.stop = function () {
   startedHoldReverseList = {}
   drawForNextFrame = true
   sflOffset = 0
+  sfl = 1
 }
 window.setPlaybackTime = function (time = 0) {
   currentTs = Math.round(time * 1000)
