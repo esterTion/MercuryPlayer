@@ -1,5 +1,5 @@
 // https://stackoverflow.com/questions/49971575/chrome-fetch-api-cannot-load-file-how-to-workaround
-if (/^file:\/\/\//.test(location.href)) {
+if (/^file:\/\/\//.test(location.href) && /chorme/i.test(navigator.userAgent)) {
     let path = './';
     let orig = fetch;
     window.fetch = (resource) => ((/^[^/:]*:/.test(resource)) ?

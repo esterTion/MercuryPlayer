@@ -2,7 +2,7 @@
 <head>
   <meta charset="UTF-8" name="viewport" content="width=device-width">
   <title>MercuryPlayer</title>
-  <style>html{background:black}canvas{position:fixed;left:0;top:0;height:100vh;width:100vw}</style>
+  <style>html{background:black;font-family:Meiryo}select,option{-moz-font:-moz-pull-down-menu;font-family:Meiryo}canvas{position:fixed;left:0;top:0;height:100vh;width:100vw}</style>
   <style>video{position:fixed;mask-size:100%;mask-image:url('data:image/svg+xml,%3Csvg height%3D"2" width%3D"2" version%3D"1.1" xmlns%3D"http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg"%3E%3Cellipse style%3D"fill%3A%23000" cx%3D"1" cy%3D"1" rx%3D"1" ry%3D"1"%2F%3E%3C%2Fsvg%3E')}</style>
 </head>
 
@@ -10,6 +10,8 @@
 <canvas id="canvas"></canvas>
 <div style="position:fixed;left:5px;bottom:5px;color:white">
   <div style="white-space:pre-wrap" id="stats"></div>
+  <div style="display:none"><select id="music_select"></select><br><select id="diffi_select"><option value="0">Normal</option><option value="1">Hard</option><option value="2" selected>Expert</option><option value="3">Inferno</option></select>　<input type="button" value="Load" onclick="loadUsingSelect()"></div>
+  <div><input id="music_input" type="text"/>　<input id="bgm_input" type="text"/>　<input type="button" value="Load" onclick="loadUsingPath()"></div>
   <input type="range" min="10" max="60" step="1" value="40" autocomplete="off" id="speed_input"><span id="speed_val">4.0</span><br>
   <input type="button" value="play" onclick="play()">
   <input type="button" value="pause" onclick="pause()">

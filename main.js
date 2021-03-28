@@ -104,9 +104,46 @@ let RENDER_DISTANCE = 750
 //parseNotesFromFile('MusicData/S00-003/S00-003_02.mer'); setBgm('0.wav')
 //parseNotesFromFile('MusicData/S02-085/S02-085_02.mer')
 //parseNotesFromFile('MusicData/S02-225/S02-225_02.mer')
-parseNotesFromFile('MusicData/S02-218/S02-218_02.mer'); setBgm('music001282.wav')
+//parseNotesFromFile('MusicData/S02-218/S02-218_02.mer'); setBgm('music001282.wav')
 //parseNotesFromFile('MusicData/S00-004/S00-004_02.mer'); setBgm('4.wav')
 //parseNotesFromFile('MusicData/S01-055/S01-055_02 (2).mer')
+//const playbackId = 'S01-031'
+//parseNotesFromFile(`MusicData/${playbackId}/${playbackId}_02.mer`); setBgm('Sound/Bgm/output/MER_BGM_'+playbackId.replace('-', '_')+'.m4a')
+let musicTable
+fetch('Table/MusicParameterTable.json').then(r=>r.json()).then(r => {
+  musicTable = r
+  music_select.parentNode.style.display = ''
+  music_input.parentNode.style.display = 'none'
+  const keys = Object.keys(r)
+  keys.sort((a,b) => a-b)
+  keys.forEach(i => {
+    const option = music_select.appendChild(document.createElement('option'))
+    option.value = i
+    diffi = [r[i].DifficultyNormalLv, r[i].DifficultyHardLv, r[i].DifficultyExtremeLv]
+    if (r[i].DifficultyInfernoLv != '0') diffi.push(r[i].DifficultyInfernoLv)
+    let title = r[i].MusicMessage, artist = r[i].ArtistMessage
+    if (title.length > 15) title = title.substr(0, 10) + '...'
+    if (artist.length > 15) artist = artist.substr(0, 10) + '...'
+    option.textContent = `${r[i].AssetDirectory} ${title} - ${artist} (${diffi.join('/')})`
+  })
+}).catch(e => {
+  console.error('failed loading music table', e)
+})
+function loadUsingSelect() {
+  const id = music_select.value | 0
+  const diffi = diffi_select.value | 0
+  if (!musicTable[id]) return alert('no such music id')
+  if (diffi < 0 || diffi > 3 || (diffi == 3 && musicTable[id].DifficultyInfernoLv == '0')) return alert('no such difficulty level')
+  stop()
+  const strId = musicTable[id].AssetDirectory
+  parseNotesFromFile(`MusicData/${strId}/${strId}_0${diffi}.mer`)
+  setBgm('Sound/Bgm/output/MER_BGM_'+strId.replace('-', '_')+'.m4a')
+}
+function loadUsingPath() {
+  parseNotesFromFile(music_input.value)
+  setBgm(bgm_input.value)
+}
+
 function setBgm(path) {
   bgm.src = path
 }
@@ -126,6 +163,7 @@ function parseNotesFromText(text) {noteList = [];
   startedHoldList = {}
   startedHoldReverseList = {}
   chartHeader = {}
+  const controlDupFix = {}
 
   const lines = text.trim().replace(/ +/g, '\t').split('\n');
   let lastEventTick = 0;
@@ -167,8 +205,14 @@ function parseNotesFromText(text) {noteList = [];
         value1: parseFloat(line[3]),
         value2: line[4] != undefined ? parseFloat(line[4]) : null,
       }
+      const controlId = line[0]+'_'+line[1]+'_'+line[2]
       control.tickTotal = tickFromSectionAndTick(control.section, control.tick);
-      controlList.push(control)
+      if (controlDupFix[controlId]) {
+        controlList[controlDupFix[controlId]] = control
+      } else {
+        controlDupFix[controlId] = controlList.length
+        controlList.push(control)
+      }
       noteList.push(control)
       lastEventTick = Math.max(lastEventTick, control.tickTotal)
     }
