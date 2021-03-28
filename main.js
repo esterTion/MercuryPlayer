@@ -20,6 +20,13 @@ const ctx = canvas.getContext('2d');
  * 13: lane effect
  * 14: end of chart
  * 16: chain
+ * 20: touch R
+ * 21: snap inward R
+ * 22: snap outward R
+ * 23: flick left R
+ * 24: flick right R
+ * 25: hold start R
+ * 26: chain R
  */
 let noteList = [];
 /**
@@ -193,7 +200,7 @@ function parseNotesFromText(text) {noteList = [];
       note.tickTotal = tickFromSectionAndTick(note.section, note.tick);
       noteList.push(note)
       lastEventTick = Math.max(lastEventTick, note.tickTotal)
-      if (note.noteType == '9' || note.noteType == '10') {
+      if (note.noteType == '9' || note.noteType == '10' || note.noteType == '25') {
         prevIdMap[note.extParam2] = note.id
       }
     } else {
@@ -297,7 +304,7 @@ function parseNotesFromText(text) {noteList = [];
 
   // fix hold chain
   noteListForPlayback.forEach(i => {
-    if (i.noteType === '9') {
+    if (i.noteType === '9' || i.noteType === '25') {
       const holdChain = [i]
       const changePoint = [0]
       let prevOffset = i.laneOffset
@@ -440,19 +447,23 @@ function render(now) {
     switch (i.noteType) {
       case 'sectionSep': {notesToRender.sectionSep.push(i); break;}
       case '1': // touch
-      case '2': {notesToRender.touch.push(i); break;} // bonus touch
-      case '3': {notesToRender.arrow.push(i); notesToRender.snapIn.push(i); break;}
-      case '4': {notesToRender.arrow.push(i); notesToRender.snapOut.push(i); break;}
+      case '2': // bonus touch
+      case '20': {notesToRender.touch.push(i); break;} // touch R
+      case '3': case '21': {notesToRender.arrow.push(i); notesToRender.snapIn.push(i); break;}
+      case '4': case '22': {notesToRender.arrow.push(i); notesToRender.snapOut.push(i); break;}
       case '5': // flick L
-      case '6': {notesToRender.arrow.push(i); notesToRender.flickL.push(i); break;} // flick L with effect
+      case '6': // flick L with effect
+      case '23': {notesToRender.arrow.push(i); notesToRender.flickL.push(i); break;} // flick Left R
       case '7': // flick R
-      case '8': {notesToRender.arrow.push(i); notesToRender.flickR.push(i); break;} // flick R with effect
+      case '8': // flick R with effect
+      case '24': {notesToRender.arrow.push(i); notesToRender.flickR.push(i); break;} // flick Right R
       case '9': // hold start
+      case '25': // hold start R
       case '11': {notesToRender.hold.push(i);} // hold end
       case '10': {notesToRender.holdBody.push(i); break;} // hold body
       case '12':
       case '13': {notesToRender.laneEffect.push(i); break;}
-      case '16': {notesToRender.chain.push(i); break;}
+      case '16': case '26': {notesToRender.chain.push(i); break;}
     }
   })
 
@@ -519,7 +530,7 @@ function render(now) {
     }
     ctx.fillStyle = 'rgba(207,162,93, 0.7)'
     notesToRender.holdBody.forEach(i => {
-      if (i.noteType == '9') {
+      if (i.noteType == '9' || i.noteType == '25') {
         let endId = i.id
         let hold = noteListForPlayback[idOffsetMap[endId]]
         while (hold.noteType !== '11') {
@@ -594,19 +605,19 @@ function render(now) {
       ctx.moveTo(centerX, centerY)
       ctx.clip()
       switch (a.noteType) {
-        case '3': {
+        case '3': case '21': {
           ctx.drawImage(arrowCanvas.in, centerX-r, centerY-r, r*2, r*2)
           break
         }
-        case '4': {
+        case '4': case '22': {
           ctx.drawImage(arrowCanvas.out, centerX-r, centerY-r, r*2, r*2)
           break
         }
-        case '5': case '6': {
+        case '5': case '6': case '23': {
           ctx.drawImage(arrowCanvas.left, centerX-r, centerY-r, r*2, r*2)
           break
         }
-        case '7': case '8': {
+        case '7': case '8': case '24': {
           ctx.drawImage(arrowCanvas.right, centerX-r, centerY-r, r*2, r*2)
           break
         }
@@ -636,6 +647,7 @@ window.stop = function () {
   startedHoldList = {}
   startedHoldReverseList = {}
   drawForNextFrame = true
+  sflOffset = 0
 }
 window.setPlaybackTime = function (time = 0) {
   currentTs = Math.round(time * 1000)
