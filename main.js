@@ -36,6 +36,8 @@ let noteList = [];
  * 6: reverse start
  * 7: reverse point
  * 8: reverse end
+ * 9: sfl 0
+ * 10: sfl 1
  */
 let controlList = [];
 let noteListForPlayback = [];
@@ -238,6 +240,14 @@ function parseNotesFromText(text) {noteList = [];
       } else {
         controlDupFix[controlId] = controlList.length
         controlList.push(control)
+      }
+      if (control.cmdType == '9') {
+        control.cmdType = '5'
+        control.value1 = 0
+      }
+      if (control.cmdType == '10') {
+        control.cmdType = '5'
+        control.value1 = 1
       }
       noteList.push(control)
       lastEventTick = Math.max(lastEventTick, control.tickTotal)
@@ -728,7 +738,7 @@ function getNotesForDraw(currentDistance, renderDistance = RENDER_DISTANCE) {
   }
   return noteListForPlayback
   .slice(Math.max(0, startOffset), Math.min(noteListForPlayback.length - 1, endOffset))
-  .filter(i => i.distance >= currentDistance && i.distance <= currentDistance + renderDistance)
+  .filter(i => i.distance > currentDistance && i.distance <= currentDistance + renderDistance)
 }
 window.getNotesForDraw = getNotesForDraw;
 
