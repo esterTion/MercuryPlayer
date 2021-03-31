@@ -126,7 +126,7 @@ let musicTable
 fetch('Table/MusicParameterTable.json').then(r=>r.json()).then(r => {
   musicTable = r
   music_select.parentNode.style.display = ''
-  music_input.parentNode.style.display = 'none'
+  music_file.parentNode.style.display = 'none'
   const keys = Object.keys(r)
   keys.sort((a,b) => a-b)
   keys.forEach(i => {
@@ -152,9 +152,15 @@ function loadUsingSelect() {
   parseNotesFromFile(`MusicData/${strId}/${strId}_0${diffi}.mer`)
   setBgm('Sound/Bgm/output/MER_BGM_'+strId.replace('-', '_')+'.m4a')
 }
-function loadUsingPath() {
-  parseNotesFromFile(music_input.value)
-  setBgm(bgm_input.value)
+function loadUsingFile() {
+  if (music_file.files.length && bgm_file.files.length) {
+    const reader = new FileReader()
+    reader.readAsText(music_file.files[0], 'UTF-8')
+    reader.onload = e => parseNotesFromText(reader.result)
+    bgm.src = URL.createObjectURL(bgm_file.files[0])
+  } else {
+    alert('choose file')
+  }
 }
 music_select.addEventListener('change', e => {
   if (!musicTable[music_select.value]) return
@@ -165,6 +171,7 @@ music_select.addEventListener('change', e => {
   if (music.DifficultyInfernoLv == "0") {
     diffi_select.children[3].setAttribute('disabled', '')
     diffi_select.children[3].textContent = 'Inferno'
+    if (diffi_select.value === '3') diffi_select.value = '2'
   } else {
     diffi_select.children[3].removeAttribute('disabled')
     diffi_select.children[3].textContent = `Inferno (${music.DifficultyInfernoLv}) - ${music.NotesDesignerInferno}`
