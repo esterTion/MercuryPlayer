@@ -453,6 +453,7 @@ function render(now) {
   }
   ctx.stroke()
 
+  let drawDistance = RENDER_DISTANCE
   if (playing) {
     if (startNextFrame) {
       startNextFrame = false
@@ -476,14 +477,15 @@ function render(now) {
     let calcBaseTs = currentTs
     for (let i=0; i<reverseSection.length; i++) {
       if (calcBaseTs > reverseSection[i][0] && calcBaseTs < reverseSection[i][1]) {
-        calcBaseTs = reverseSection[i][1] + (reverseSection[i][1] - calcBaseTs) * (reverseSection[i][1] - reverseSection[i][0]) / (reverseSection[i][2] - reverseSection[i][1])
+        calcBaseTs = reverseSection[i][1] + (reverseSection[i][1] - calcBaseTs) * (reverseSection[i][2] - reverseSection[i][1]) / (reverseSection[i][1] - reverseSection[i][0])
+        drawDistance = Math.min(drawDistance, reverseSection[i][2] - calcBaseTs)
         break
       }
     }
     currentDistance = (calcBaseTs - sflTsList[sflOffset].timestamp) * sfl + sflTsList[sflOffset].distance
   }
   previousTs = now
-  const notesToRenderArr = getNotesForDraw(currentDistance)
+  const notesToRenderArr = getNotesForDraw(currentDistance, drawDistance)
   notesToRender = {
     sectionSep: [],
     touch: [],
@@ -745,7 +747,7 @@ function getNotesForDraw(currentDistance, renderDistance = RENDER_DISTANCE) {
   }
   return noteListForPlayback
   .slice(Math.max(0, startOffset), Math.min(noteListForPlayback.length - 1, endOffset))
-  .filter(i => i.distance > currentDistance && i.distance <= currentDistance + renderDistance)
+  .filter(i => i.distance > currentDistance && i.distance < currentDistance + renderDistance)
 }
 window.getNotesForDraw = getNotesForDraw;
 
