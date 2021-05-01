@@ -111,7 +111,7 @@ function createArrows() {
 const enableBga = false
 
 const TICK_PER_GAME_SECTION = 1920;
-const TICK_PER_BEAT = TICK_PER_GAME_SECTION / 4;
+const TICK_PER_BEAT = TICK_PER_GAME_SECTION / 3.8;
 let RENDER_DISTANCE = 750
 
 //parseNotesFromFile('MusicData/S00-003/S00-003_02.mer'); setBgm('0.wav')
@@ -123,22 +123,38 @@ let RENDER_DISTANCE = 750
 //const playbackId = 'S01-031'
 //parseNotesFromFile(`MusicData/${playbackId}/${playbackId}_02.mer`); setBgm('Sound/Bgm/output/MER_BGM_'+playbackId.replace('-', '_')+'.m4a')
 let musicTable
-fetch('Table/MusicParameterTable.json').then(r=>r.json()).then(r => {
-  musicTable = r
+function cutText(s) {
+  const charRenderSize = s.split('').map(c=> c.match(/[a-zA-Z0-9 ]/)?1:2)
+  const renderLengthTotal = charRenderSize.reduce((s,v) => s+v, 0)
+  if (renderLengthTotal < 30) return s
+  let renderLength = 0
+  for (let i=0; i<charRenderSize.length; i++) {
+    renderLength += charRenderSize[i]
+    if (renderLength > 25) return s.substr(0, i) + '...'
+  }
+}
+fetch('Table/music_info.json').then(r=>r.json()).then(r => {
+  musicTable = {}
   music_select.parentNode.style.display = ''
   music_file.parentNode.style.display = 'none'
   const keys = Object.keys(r)
-  keys.sort((a,b) => a-b)
-  keys.forEach(i => {
+  keys.sort((a,b) => a>b?1:-1)
+  keys.forEach(open => {
     const option = music_select.appendChild(document.createElement('option'))
-    option.value = i
-    diffi = [r[i].DifficultyNormalLv, r[i].DifficultyHardLv, r[i].DifficultyExtremeLv]
-    if (r[i].DifficultyInfernoLv != '0') diffi.push(r[i].DifficultyInfernoLv)
-    let title = r[i].MusicMessage, artist = r[i].ArtistMessage
-    if (title.length > 15) title = title.substr(0, 10) + '...'
-    if (artist.length > 15) artist = artist.substr(0, 10) + '...'
-    option.textContent = `${r[i].AssetDirectory} (${diffi.join('/')}) ${title} - ${artist}`
+    option.setAttribute('disabled', '')
+    option.textContent = open
+    r[open].sort((a,b) => a.id-b.id)
+    r[open].forEach(music => {
+      musicTable[music.id] = music;
+      const option = music_select.appendChild(document.createElement('option'))
+      option.value = music.id
+      diffi = [music.DifficultyNormalLv, music.DifficultyHardLv, music.DifficultyExtremeLv]
+      if (music.DifficultyInfernoLv != '0') diffi.push(music.DifficultyInfernoLv)
+      let title = cutText(music.title), artist = cutText(music.artist)
+      option.textContent = `${music.AssetDirectory} (${diffi.join('/')}) ${title} - ${artist}`
+    })
   })
+  music_select.value = music_select.children[1].value
 }).catch(e => {
   console.error('failed loading music table', e)
 })
@@ -409,6 +425,8 @@ let playing = false;
 let sfl = 1
 let sflOffset = 0
 let drawForNextFrame = false
+let NOTE_APPEAR_DISTANCE = 1
+let NOTE_SPEED_POWER = 1.95
 function render(now) {
   requestAnimationFrame(render)
   drawCount.frame++
@@ -528,7 +546,7 @@ function render(now) {
     ctx.lineWidth = 1.5
     ctx.strokeStyle = '#555'
     notesToRender.sectionSep.forEach(i => {
-      const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * 0.85, 1.9)
+      const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
       ctx.beginPath()
       ctx.arc(
         centerX, centerY,
@@ -566,7 +584,7 @@ function render(now) {
         actualEndWidth = (endWidth - startWidth) * (currentDistance + RENDER_DISTANCE - startDistance) / (endDistance - startDistance) + endWidth
         actualEndDistance = currentDistance + RENDER_DISTANCE
       }
-      const r = maxR * Math.pow(1 - Math.max(actualStartDistance - currentDistance, 0) / RENDER_DISTANCE * 0.85, 1.9)
+      const r = maxR * Math.pow(1 - Math.max(actualStartDistance - currentDistance, 0) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
       const start = 60 - actualStartOffset - actualStartWidth, end = 60 - actualStartOffset
       ctx.beginPath()
       ctx.arc(
@@ -574,7 +592,7 @@ function render(now) {
         r,
         Math.PI * (start / 30), Math.PI * (end / 30)
       )
-      const r2 = maxR * Math.pow(1 - Math.min(actualEndDistance - currentDistance, RENDER_DISTANCE) / RENDER_DISTANCE * 0.85, 1.9)
+      const r2 = maxR * Math.pow(1 - Math.min(actualEndDistance - currentDistance, RENDER_DISTANCE) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
       const start2 = 60 - actualEndOffset - actualEndWidth, end2 = 60 - actualEndOffset
       ctx.arc(
         centerX, centerY,
@@ -632,7 +650,7 @@ function render(now) {
     if (notesToRender[key].length) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
-        const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * 0.85, 1.9)
+        const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
         ctx.lineWidth = (r * 5 / maxR + 2) * thicc
         const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
         ctx.beginPath()
@@ -649,7 +667,7 @@ function render(now) {
   if (notesToRender.arrow.length) {
     for (let i=notesToRender.arrow.length-1; i>=0; i--) {
       const a = notesToRender.arrow[i]
-      const r = maxR * Math.pow(1 - (a.distance - currentDistance) / RENDER_DISTANCE * 0.85, 1.9)
+      const r = maxR * Math.pow(1 - (a.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
       const start = 60 - a.laneOffset - a.noteWidth, end = 60 - a.laneOffset
       ctx.save()
       ctx.beginPath()
