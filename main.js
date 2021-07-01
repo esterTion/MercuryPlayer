@@ -42,6 +42,7 @@ let noteList = [];
 let controlList = [];
 let noteListForPlayback = [];
 let sflTsList = []
+let laneToggleList = []
 let idOffsetMap = []
 let prevIdMap = {}
 let startedHoldList = {}
@@ -120,7 +121,7 @@ let RENDER_DISTANCE = 750
 //parseNotesFromFile('MusicData/S02-218/S02-218_02.mer'); setBgm('music001282.wav')
 //parseNotesFromFile('MusicData/S00-004/S00-004_02.mer'); setBgm('4.wav')
 //parseNotesFromFile('MusicData/S01-055/S01-055_02 (2).mer')
-//const playbackId = 'S01-031'
+//const playbackId = 'S01-093'
 //parseNotesFromFile(`MusicData/${playbackId}/${playbackId}_02.mer`); setBgm('Sound/Bgm/output/MER_BGM_'+playbackId.replace('-', '_')+'.m4a')
 let musicTable
 function cutText(s) {
@@ -395,6 +396,8 @@ function parseNotesFromText(text) {noteList = [];
     ])
   }
 
+  laneToggleList = noteList.filter(i => (i.noteType === '12' || i.noteType === '13'))
+
   console.log('parsed notes')
 
   window.noteTypes = {}
@@ -427,6 +430,7 @@ let sflOffset = 0
 let drawForNextFrame = false
 let NOTE_APPEAR_DISTANCE = 1
 let NOTE_SPEED_POWER = 1.95
+const laneOnState = new Uint8Array(300)
 function render(now) {
   requestAnimationFrame(render)
   drawCount.frame++
@@ -472,6 +476,7 @@ function render(now) {
   ctx.stroke()
 
   let drawDistance = RENDER_DISTANCE
+  let previousTs = currentTs
   if (playing) {
     if (startNextFrame) {
       startNextFrame = false
@@ -482,6 +487,7 @@ function render(now) {
           startTs -= offset * 1000
         }
       }
+      updateLaneOnState(-1, currentTs)
     }
     if (!(currentTs > sflTsList[sflOffset].timestamp && (sflOffset === sflTsList.length - 1 || currentTs <= sflTsList[sflOffset + 1].timestamp))) {
       for (sflOffset = 0; sflOffset < sflTsList.length - 1; sflOffset++) {
@@ -502,7 +508,22 @@ function render(now) {
     }
     currentDistance = (calcBaseTs - sflTsList[sflOffset].timestamp) * sfl + sflTsList[sflOffset].distance
   }
-  previousTs = now
+  updateLaneOnState(previousTs, currentTs)
+  // black out "off" lanes
+  ctx.fillStyle = 'rgba(0,0,0,.5)'
+  ctx.beginPath()
+  for (let i = 0; i < 300; i++) {
+    if (laneOnState[i]) continue
+    const start = 300 - i - 1, end = 300 - i
+    ctx.moveTo(centerX, centerY)
+    ctx.arc(
+      centerX, centerY,
+      maxR,
+      Math.PI * (start / 150), Math.PI * (end / 150)
+    )
+    ctx.lineTo(centerX, centerY)
+  }
+  ctx.fill()
   const notesToRenderArr = getNotesForDraw(currentDistance, drawDistance)
   notesToRender = {
     sectionSep: [],
@@ -534,7 +555,7 @@ function render(now) {
       case '24': {notesToRender.arrow.push(i); notesToRender.flickR.push(i); break;} // flick Right R
       case '9': // hold start
       case '25': // hold start R
-      case '11': {notesToRender.hold.push(i);} // hold end
+      case '11-': {notesToRender.hold.push(i);} // hold end
       case '10': {notesToRender.holdBody.push(i); break;} // hold body
       case '12':
       case '13': {notesToRender.laneEffect.push(i); break;}
@@ -761,13 +782,92 @@ function getNotesForDraw(currentDistance, renderDistance = RENDER_DISTANCE) {
       if (result > 0) head = mid + 1;
     }
     endOffset = mid
-    while (endOffset < noteListForPlayback.length - 1 && noteListForPlayback[endOffset].distance <= currentDistance + renderDistance) endOffset++;
+    while (endOffset < noteListForPlayback.length && noteListForPlayback[endOffset].distance <= currentDistance + renderDistance) endOffset++;
   }
   return noteListForPlayback
-  .slice(Math.max(0, startOffset), Math.min(noteListForPlayback.length - 1, endOffset))
+  .slice(Math.max(0, startOffset), Math.min(noteListForPlayback.length, endOffset))
   .filter(i => i.distance > currentDistance && i.distance < currentDistance + renderDistance)
 }
 window.getNotesForDraw = getNotesForDraw;
+
+const pendingLaneChange = []
+const transitionLength = 80
+function updateLaneOnState(fromTs, toTs) {
+  if (!laneToggleList.length) return
+  // search sub array start
+  let startOffset, endOffset
+  {
+    let head = 0, tail = laneToggleList.length - 1
+    let mid
+    while (head <= tail) {
+      mid = Math.floor((head + tail) / 2)
+      const result = fromTs - laneToggleList[mid].timestamp
+      if (result === 0) break;
+      if (result < 0) tail = mid - 1;
+      if (result > 0) head = mid + 1;
+    }
+    startOffset = mid
+    while (startOffset > 0 && laneToggleList[startOffset].timestamp >= fromTs) startOffset--;
+  }
+  // search sub array end
+  {
+    let head = 0, tail = laneToggleList.length - 1
+    let mid
+    while (head <= tail) {
+      mid = Math.floor((head + tail) / 2)
+      const result = toTs - laneToggleList[mid].timestamp
+      if (result === 0) break;
+      if (result < 0) tail = mid - 1;
+      if (result > 0) head = mid + 1;
+    }
+    endOffset = mid
+    while (endOffset < laneToggleList.length && laneToggleList[endOffset].timestamp <= toTs) endOffset++;
+  }
+  const updateList = laneToggleList
+  .slice(Math.max(0, startOffset), Math.min(laneToggleList.length, endOffset))
+  .filter(i => i.timestamp > fromTs && i.timestamp < toTs)
+  if (fromTs === -1) {
+    pendingLaneChange.splice(0, pendingLaneChange.length)
+  }
+  updateList.forEach(i => {
+    if (toTs - i.timestamp > transitionLength) {
+      const value = i.noteType === '12' ? 1 : 0
+      const width = i.noteWidth * 5
+      for (let idx = 0; idx < width; idx++) {
+        laneOnState[(i.laneOffset * 5 + idx) % 300] = value
+      }
+    } else {
+      pendingLaneChange.push(i)
+    }
+  })
+  pendingLaneChange.forEach(i => {
+    const value = i.noteType === '12' ? 1 : 0
+    const transitionPercent = Math.min(toTs - i.timestamp, transitionLength) / transitionLength
+    const width = i.noteWidth * 5
+    if (toTs - i.timestamp > transitionLength) {
+      for (let idx = 0; idx < width; idx++) {
+        laneOnState[(i.laneOffset * 5 + idx) % 300] = value
+      }
+      pendingLaneChange.splice(pendingLaneChange.indexOf(i), 1)
+      return
+    }
+    for (let idx = 0; idx < width; idx++) {
+      if (i.extParam2 === 0) {
+        if (idx > width * transitionPercent) continue
+      } else if (i.extParam2 === 1) {
+        if (width - idx > width * transitionPercent) continue
+      } else if (i.extParam2 === 2) {
+        const transitionBorder = width * transitionPercent / 2
+        if (value === 1) {
+          if (Math.abs(width/2 - idx - 0.5) > (width / 2 - transitionBorder)) continue
+        } else {
+          if (Math.abs(width/2 - idx - 0.5) < (width / 2 - transitionBorder)) continue
+        }
+      }
+      laneOnState[(i.laneOffset * 5 + idx) % 300] = value
+    }
+  })
+}
 
 bgm.addEventListener('seeked', function (e) {
   currentTs = Math.round(this.currentTime * 1000)
