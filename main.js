@@ -792,54 +792,30 @@ window.getNotesForDraw = getNotesForDraw;
 
 const pendingLaneChange = []
 const transitionLength = 80
+let laneChangeIdx = 0
 function updateLaneOnState(fromTs, toTs) {
   if (!laneToggleList.length) return
-  // search sub array start
-  let startOffset, endOffset
-  {
-    let head = 0, tail = laneToggleList.length - 1
-    let mid
-    while (head <= tail) {
-      mid = Math.floor((head + tail) / 2)
-      const result = fromTs - laneToggleList[mid].timestamp
-      if (result === 0) break;
-      if (result < 0) tail = mid - 1;
-      if (result > 0) head = mid + 1;
-    }
-    startOffset = mid
-    while (startOffset > 0 && laneToggleList[startOffset].timestamp >= fromTs) startOffset--;
-  }
-  // search sub array end
-  {
-    let head = 0, tail = laneToggleList.length - 1
-    let mid
-    while (head <= tail) {
-      mid = Math.floor((head + tail) / 2)
-      const result = toTs - laneToggleList[mid].timestamp
-      if (result === 0) break;
-      if (result < 0) tail = mid - 1;
-      if (result > 0) head = mid + 1;
-    }
-    endOffset = mid
-    while (endOffset < laneToggleList.length && laneToggleList[endOffset].timestamp <= toTs) endOffset++;
-  }
-  const updateList = laneToggleList
-  .slice(Math.max(0, startOffset), Math.min(laneToggleList.length, endOffset))
-  .filter(i => i.timestamp > fromTs && i.timestamp < toTs)
   if (fromTs === -1) {
     pendingLaneChange.splice(0, pendingLaneChange.length)
+    for (let i=0; i<300; i++) {
+      laneOnState[i] = 0
+    }
+    laneChangeIdx = 0
   }
-  updateList.forEach(i => {
+  while (laneChangeIdx < laneToggleList.length) {
+    let i = laneToggleList[laneChangeIdx]
+    if (i.timestamp > toTs) break
     if (toTs - i.timestamp > transitionLength) {
       const value = i.noteType === '12' ? 1 : 0
       const width = i.noteWidth * 5
       for (let idx = 0; idx < width; idx++) {
         laneOnState[(i.laneOffset * 5 + idx) % 300] = value
       }
-    } else {
+    } else if (pendingLaneChange.indexOf(i) === -1) {
       pendingLaneChange.push(i)
     }
-  })
+    laneChangeIdx++
+  }
   pendingLaneChange.forEach(i => {
     const value = i.noteType === '12' ? 1 : 0
     const transitionPercent = Math.min(toTs - i.timestamp, transitionLength) / transitionLength
@@ -852,16 +828,17 @@ function updateLaneOnState(fromTs, toTs) {
       return
     }
     for (let idx = 0; idx < width; idx++) {
+      let idxCompare = idx + 0.5
       if (i.extParam2 === 0) {
-        if (idx > width * transitionPercent) continue
+        if (idxCompare > width * transitionPercent) continue
       } else if (i.extParam2 === 1) {
-        if (width - idx > width * transitionPercent) continue
+        if (width - idxCompare > width * transitionPercent) continue
       } else if (i.extParam2 === 2) {
         const transitionBorder = width * transitionPercent / 2
         if (value === 1) {
-          if (Math.abs(width/2 - idx - 0.5) > (width / 2 - transitionBorder)) continue
+          if (Math.abs(width/2 - idxCompare) > transitionBorder) continue
         } else {
-          if (Math.abs(width/2 - idx - 0.5) < (width / 2 - transitionBorder)) continue
+          if (Math.abs(width/2 - idxCompare) < (width / 2 - transitionBorder)) continue
         }
       }
       laneOnState[(i.laneOffset * 5 + idx) % 300] = value
