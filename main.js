@@ -510,7 +510,12 @@ function render(now) {
   }
   updateLaneOnState(previousTs, currentTs)
   // black out "off" lanes
-  ctx.fillStyle = 'rgba(0,0,0,.5)'
+  const laneBgGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxR)
+  laneBgGradient.addColorStop(0, 'rgba(0,0,0,0)');
+  laneBgGradient.addColorStop(0.1, 'rgba(0,0,0,0)');
+  laneBgGradient.addColorStop(0.2, 'rgba(0,0,0,0.1)');
+  laneBgGradient.addColorStop(1, 'rgba(0,0,0,0.4)');
+  ctx.fillStyle = laneBgGradient
   ctx.beginPath()
   for (let i = 0; i < 300; i++) {
     if (laneOnState[i]) continue
