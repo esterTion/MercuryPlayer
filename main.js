@@ -512,7 +512,6 @@ function render(now) {
   // black out "off" lanes
   const laneBgGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxR)
   laneBgGradient.addColorStop(0, 'rgba(0,0,0,0)');
-  laneBgGradient.addColorStop(0.1, 'rgba(0,0,0,0)');
   laneBgGradient.addColorStop(0.2, 'rgba(0,0,0,0.1)');
   laneBgGradient.addColorStop(1, 'rgba(0,0,0,0.4)');
   ctx.fillStyle = laneBgGradient
@@ -541,6 +540,7 @@ function render(now) {
     snapIn: [],
     snapOut: [],
     arrow: [],
+    R: [],
     laneEffect: [],
     unknown: []
   }
@@ -565,6 +565,9 @@ function render(now) {
       case '12':
       case '13': {notesToRender.laneEffect.push(i); break;}
       case '16': case '26': {notesToRender.chain.push(i); break;}
+    }
+    if (i.noteType >= '20' && i.noteType <= '26') {
+      notesToRender.R.push(i);
     }
   })
 
@@ -661,6 +664,28 @@ function render(now) {
       }
     })
   }
+
+  // white border for R notes
+  {
+    const key = 'R', color = 'rgb(255,255,255)'
+    const thicc = 4
+    if (notesToRender[key].length) {
+      ctx.strokeStyle = color
+      notesToRender[key].forEach(i => {
+        const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
+        ctx.lineWidth = (r * 5 / maxR + 2) * thicc
+        const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
+        ctx.beginPath()
+        ctx.arc(
+          centerX, centerY,
+          r,
+          Math.PI * (start / 30) + 0.01, Math.PI * (end / 30) - 0.01
+        )
+        ctx.stroke()
+      })
+    }
+  }
+
   const colorMap = [
     ['hold', 'rgb(88,75,47)'],
     ['touch', 'rgb(216,45,184)'],
