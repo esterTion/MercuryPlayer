@@ -74,7 +74,7 @@ function createArrows() {
     ctx.in.arc(maxR, maxR, maxR * 0.95, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
     ctx.in.arc(maxR, maxR, maxR * 0.85, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
     ctx.in.arc(maxR, maxR, maxR * 0.95, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
-    ctx.in.strokeStyle = 'black'; ctx.in.lineWidth = 12; ctx.in.stroke()
+    ctx.in.strokeStyle = 'rgb(200,200,200)'; ctx.in.lineWidth = 12; ctx.in.stroke()
     ctx.in.strokeStyle = 'rgb(203,29,25)'; ctx.in.lineWidth = 5; ctx.in.stroke()
   }
 
@@ -84,7 +84,7 @@ function createArrows() {
     ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
     ctx.out.arc(maxR, maxR, maxR * 0.95, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
     ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
-    ctx.out.strokeStyle = 'black'; ctx.out.lineWidth = 12; ctx.out.stroke()
+    ctx.out.strokeStyle = 'rgb(200,200,200)'; ctx.out.lineWidth = 12; ctx.out.stroke()
     ctx.out.strokeStyle = 'rgb(33,180,251)'; ctx.out.lineWidth = 5; ctx.out.stroke()
   }
 
@@ -94,7 +94,7 @@ function createArrows() {
     ctx.left.arc(maxR, maxR, maxR * 0.85, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
     ctx.left.arc(maxR, maxR, maxR * 0.90, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
     ctx.left.arc(maxR, maxR, maxR * 0.95, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
-    ctx.left.strokeStyle = 'black'; ctx.left.lineWidth = 12; ctx.left.stroke()
+    ctx.left.strokeStyle = 'rgb(200,200,200)'; ctx.left.lineWidth = 12; ctx.left.stroke()
     ctx.left.strokeStyle = 'rgb(246,159,55)'; ctx.left.lineWidth = 5; ctx.left.stroke()
   }
 
@@ -104,7 +104,7 @@ function createArrows() {
     ctx.right.arc(maxR, maxR, maxR * 0.85, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
     ctx.right.arc(maxR, maxR, maxR * 0.90, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
     ctx.right.arc(maxR, maxR, maxR * 0.95, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
-    ctx.right.strokeStyle = 'black'; ctx.right.lineWidth = 12; ctx.right.stroke()
+    ctx.right.strokeStyle = 'rgb(200,200,200)'; ctx.right.lineWidth = 12; ctx.right.stroke()
     ctx.right.strokeStyle = 'rgb(98,251,43)'; ctx.right.lineWidth = 5; ctx.right.stroke()
   }
 }
@@ -462,17 +462,17 @@ function render(now) {
   ctx.beginPath();
   ctx.arc(centerX, centerY, maxR, 0, Math.PI * 2)
   ctx.stroke()
-  ctx.fillStyle = 'white'
-  if (!enableBga) ctx.fill()
-  ctx.fillStyle = enableBga ? 'rgba(50,50,50,0.8)' : 'rgba(50,50,50,0.5)'
-  ctx.fill()
+  if (enableBga) {
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'
+    ctx.fill()
+  }
 
   // lanes
   const laneGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxR)
-  laneGradient.addColorStop(0, 'rgba(0,0,0,0)');
-  laneGradient.addColorStop(0.1, 'rgba(0,0,0,0)');
-  laneGradient.addColorStop(0.2, 'rgba(0,0,0,0.3)');
-  laneGradient.addColorStop(1, 'rgba(0,0,0,0.8)');
+  laneGradient.addColorStop(0, 'rgba(128,128,128,0)');
+  laneGradient.addColorStop(0.1, 'rgba(128,128,128,0)');
+  laneGradient.addColorStop(0.2, 'rgba(128,128,128,0.3)');
+  laneGradient.addColorStop(1, 'rgba(128,128,128,0.8)');
   ctx.lineWidth = 1
   ctx.strokeStyle = laneGradient
   ctx.beginPath();
@@ -521,13 +521,13 @@ function render(now) {
   updateLaneOnState(previousTs, currentTs)
   // black out "off" lanes
   const laneBgGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxR)
-  laneBgGradient.addColorStop(0, 'rgba(0,0,0,0)');
-  laneBgGradient.addColorStop(0.2, 'rgba(0,0,0,0.1)');
-  laneBgGradient.addColorStop(1, enableBga ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.4)');
+  laneBgGradient.addColorStop(0, 'rgba(255,255,255,0)');
+  laneBgGradient.addColorStop(0.2, 'rgba(255,255,255,0.1)');
+  laneBgGradient.addColorStop(1, enableBga ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.4)');
   ctx.fillStyle = laneBgGradient
   ctx.beginPath()
   for (let i = 0; i < 60 * laneEffectMul; i++) {
-    if (laneOnState[i]) continue
+    if (laneOnState[i] == 0) continue
     const start = 60 * laneEffectMul - i - 1, end = 60 * laneEffectMul - i
     ctx.moveTo(centerX, centerY)
     ctx.arc(
