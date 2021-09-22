@@ -322,6 +322,7 @@ function parseNotesFromText(text) {noteList = [];
       }
       currentNote.timestamp = timeStampOffset + Math.round((currentNote.tickTotal - fromTick) / TICK_PER_BEAT * 60000 / bpm);
       if (currentNote.noteType !== undefined) noteListForPlayback.push(currentNote);
+      if (currentNote.noteType === '14') chartLength = currentNote.timestamp
     }
     timeStampOffset += Math.round((toTick - fromTick) / TICK_PER_BEAT * 60000 / bpm);
   }
@@ -430,7 +431,9 @@ let sflOffset = 0
 let drawForNextFrame = false
 let NOTE_APPEAR_DISTANCE = 1
 let NOTE_SPEED_POWER = 1.95
-const laneOnState = new Uint8Array(300)
+let chartLength = 0
+const laneEffectMul = 1
+const laneOnState = new Uint8Array(60 * laneEffectMul)
 function render(now) {
   requestAnimationFrame(render)
   drawCount.frame++
@@ -454,7 +457,7 @@ function render(now) {
   ctx.stroke()
   ctx.fillStyle = 'white'
   if (!enableBga) ctx.fill()
-  ctx.fillStyle = enableBga ? 'rgba(50,50,50,0.7)' : 'rgba(50,50,50,0.5)'
+  ctx.fillStyle = enableBga ? 'rgba(50,50,50,0.8)' : 'rgba(50,50,50,0.5)'
   ctx.fill()
 
   // lanes
@@ -513,17 +516,17 @@ function render(now) {
   const laneBgGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxR)
   laneBgGradient.addColorStop(0, 'rgba(0,0,0,0)');
   laneBgGradient.addColorStop(0.2, 'rgba(0,0,0,0.1)');
-  laneBgGradient.addColorStop(1, 'rgba(0,0,0,0.4)');
+  laneBgGradient.addColorStop(1, enableBga ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.4)');
   ctx.fillStyle = laneBgGradient
   ctx.beginPath()
-  for (let i = 0; i < 300; i++) {
+  for (let i = 0; i < 60 * laneEffectMul; i++) {
     if (laneOnState[i]) continue
-    const start = 300 - i - 1, end = 300 - i
+    const start = 60 * laneEffectMul - i - 1, end = 60 * laneEffectMul - i
     ctx.moveTo(centerX, centerY)
     ctx.arc(
       centerX, centerY,
       maxR,
-      Math.PI * (start / 150), Math.PI * (end / 150)
+      Math.PI * (start / 30 / laneEffectMul), Math.PI * (end / 30 / laneEffectMul)
     )
     ctx.lineTo(centerX, centerY)
   }
@@ -751,11 +754,29 @@ function render(now) {
       ctx.restore()
     }
   }
+
+  {
+    let chartRemaining = 1
+    if (chartLength) {
+      chartRemaining = Math.max(0, 1 - currentTs / chartLength)
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'
+    const r = maxR * 0.98
+    ctx.lineWidth = (r * 5 / maxR + 2)
+    ctx.beginPath()
+    ctx.arc(
+      centerX, centerY,
+      r,
+      Math.PI * (-0.5 - chartRemaining * 2), -Math.PI * 0.5
+    )
+    ctx.stroke()
+  }
 }
 window.play = function () {
   startNextFrame = true
   bgm.play()
   if (enableBga) bga.play()
+  bga.muted = true
   currentTs = Math.round(bgm.currentTime * 1000)
   playing = true
 }
@@ -827,7 +848,7 @@ function updateLaneOnState(fromTs, toTs) {
   if (!laneToggleList.length) return
   if (fromTs === -1) {
     pendingLaneChange.splice(0, pendingLaneChange.length)
-    for (let i=0; i<300; i++) {
+    for (let i=0; i<60 * laneEffectMul; i++) {
       laneOnState[i] = 0
     }
     laneChangeIdx = 0
@@ -835,11 +856,11 @@ function updateLaneOnState(fromTs, toTs) {
   while (laneChangeIdx < laneToggleList.length) {
     let i = laneToggleList[laneChangeIdx]
     if (i.timestamp > toTs) break
-    if (toTs - i.timestamp > transitionLength) {
+    if (i.tickTotal === 0 || toTs - i.timestamp > transitionLength) {
       const value = i.noteType === '12' ? 1 : 0
-      const width = i.noteWidth * 5
+      const width = i.noteWidth * laneEffectMul
       for (let idx = 0; idx < width; idx++) {
-        laneOnState[(i.laneOffset * 5 + idx) % 300] = value
+        laneOnState[(i.laneOffset * laneEffectMul + idx) % (60 * laneEffectMul)] = value
       }
     } else if (pendingLaneChange.indexOf(i) === -1) {
       pendingLaneChange.push(i)
@@ -849,10 +870,10 @@ function updateLaneOnState(fromTs, toTs) {
   pendingLaneChange.forEach(i => {
     const value = i.noteType === '12' ? 1 : 0
     const transitionPercent = Math.min(toTs - i.timestamp, transitionLength) / transitionLength
-    const width = i.noteWidth * 5
+    const width = i.noteWidth * laneEffectMul
     if (toTs - i.timestamp > transitionLength) {
       for (let idx = 0; idx < width; idx++) {
-        laneOnState[(i.laneOffset * 5 + idx) % 300] = value
+        laneOnState[(i.laneOffset * laneEffectMul + idx) % (60 * laneEffectMul)] = value
       }
       pendingLaneChange.splice(pendingLaneChange.indexOf(i), 1)
       return
@@ -871,7 +892,7 @@ function updateLaneOnState(fromTs, toTs) {
           if (Math.abs(width/2 - idxCompare) < (width / 2 - transitionBorder)) continue
         }
       }
-      laneOnState[(i.laneOffset * 5 + idx) % 300] = value
+      laneOnState[(i.laneOffset * laneEffectMul + idx) % (60 * laneEffectMul)] = value
     }
   })
 }
