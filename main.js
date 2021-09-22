@@ -221,6 +221,7 @@ function parseNotesFromText(text) {noteList = [];
   let lastEventTick = 0;
   let nextHoldMap = {}
   const holdFillTickGap = 3
+  const tickNoteCount = {}
   lines.forEach(line => {
     line = line.trim().split('\t');
     // ignore headers
@@ -243,6 +244,11 @@ function parseNotesFromText(text) {noteList = [];
         extParam2: line[8] != undefined ? parseInt(line[8]) : null
       }
       note.tickTotal = tickFromSectionAndTick(note.section, note.tick);
+      if (['10','11','12','13','16','26'].indexOf(note.noteType) === -1) {
+        if (!tickNoteCount[note.tickTotal]) tickNoteCount[note.tickTotal] = 0
+        tickNoteCount[note.tickTotal]++
+      }
+      note.hasSameTime = false
       noteList.push(note)
       lastEventTick = Math.max(lastEventTick, note.tickTotal)
       if (note.noteType == '9' || note.noteType == '10' || note.noteType == '25') {
@@ -323,6 +329,7 @@ function parseNotesFromText(text) {noteList = [];
       currentNote.timestamp = timeStampOffset + Math.round((currentNote.tickTotal - fromTick) / TICK_PER_BEAT * 60000 / bpm);
       if (currentNote.noteType !== undefined) noteListForPlayback.push(currentNote);
       if (currentNote.noteType === '14') chartLength = currentNote.timestamp
+      if (tickNoteCount[currentNote.tickTotal] > 1 && ['sectionSep', '10', '11', '12', '13', '16', '26'].indexOf(currentNote.noteType) === -1) currentNote.hasSameTime = true
     }
     timeStampOffset += Math.round((toTick - fromTick) / TICK_PER_BEAT * 60000 / bpm);
   }
@@ -545,6 +552,7 @@ function render(now) {
     arrow: [],
     R: [],
     laneEffect: [],
+    sameTime: [],
     unknown: []
   }
   notesToRenderArr.forEach(i => {
@@ -571,6 +579,9 @@ function render(now) {
     }
     if (i.noteType >= '20' && i.noteType <= '26') {
       notesToRender.R.push(i);
+    }
+    if (i.hasSameTime) {
+      notesToRender.sameTime.push(i)
     }
   })
 
@@ -668,10 +679,10 @@ function render(now) {
     })
   }
 
-  // white border for R notes
+  // blue extend for same time notes
   {
-    const key = 'R', color = 'rgb(255,255,255)'
-    const thicc = 4
+    const key = 'sameTime', color = 'rgb(80,255,250)'
+    const thicc = 3
     if (notesToRender[key].length) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
@@ -682,7 +693,29 @@ function render(now) {
         ctx.arc(
           centerX, centerY,
           r,
-          Math.PI * (start / 30) + 0.01, Math.PI * (end / 30) - 0.01
+          Math.PI * (start / 30), Math.PI * (end / 30)
+        )
+        ctx.stroke()
+      })
+    }
+  }
+
+  // white border for R notes
+  {
+    const key = 'R', color = 'rgb(255,255,255)'
+    const thicc = 4
+    if (notesToRender[key].length) {
+      ctx.strokeStyle = color
+      notesToRender[key].forEach(i => {
+        const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
+        ctx.lineWidth = (r * 5 / maxR + 2) * thicc
+        const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
+        const cutOut = i.noteWidth < 60 ? 0.01 : 0
+        ctx.beginPath()
+        ctx.arc(
+          centerX, centerY,
+          r,
+          Math.PI * (start / 30) + cutOut, Math.PI * (end / 30) - cutOut
         )
         ctx.stroke()
       })
@@ -707,11 +740,12 @@ function render(now) {
         const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
         ctx.lineWidth = (r * 5 / maxR + 2) * thicc
         const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
+        const cutOut = i.noteWidth < 60 ? 0.03 : 0
         ctx.beginPath()
         ctx.arc(
           centerX, centerY,
           r,
-          Math.PI * (start / 30) + 0.03, Math.PI * (end / 30) - 0.03
+          Math.PI * (start / 30) + cutOut, Math.PI * (end / 30) - cutOut
         )
         ctx.stroke()
       })
