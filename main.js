@@ -68,14 +68,16 @@ function createArrows() {
     right: arrowCanvas.right.getContext('2d'),
   }
 
+  const borderWidth = 12 * devicePixelRatio, colorWidth = 5 * devicePixelRatio
+
   ctx.in.translate(maxR, maxR); ctx.in.rotate(Math.PI / 2); ctx.in.translate(-maxR, -maxR)
   for (let i = 0; i < 30; i++) {
     ctx.in.beginPath()
     ctx.in.arc(maxR, maxR, maxR * 0.95, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
     ctx.in.arc(maxR, maxR, maxR * 0.85, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
     ctx.in.arc(maxR, maxR, maxR * 0.95, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
-    ctx.in.strokeStyle = 'rgb(200,200,200)'; ctx.in.lineWidth = 12; ctx.in.stroke()
-    ctx.in.strokeStyle = 'rgb(203,29,25)'; ctx.in.lineWidth = 5; ctx.in.stroke()
+    ctx.in.strokeStyle = 'rgb(200,200,200)'; ctx.in.lineWidth = borderWidth; ctx.in.stroke()
+    ctx.in.strokeStyle = 'rgb(203,29,25)'; ctx.in.lineWidth = colorWidth; ctx.in.stroke()
   }
 
   ctx.out.translate(maxR, maxR); ctx.out.rotate(Math.PI / 2); ctx.out.translate(-maxR, -maxR)
@@ -84,8 +86,8 @@ function createArrows() {
     ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
     ctx.out.arc(maxR, maxR, maxR * 0.95, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
     ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
-    ctx.out.strokeStyle = 'rgb(200,200,200)'; ctx.out.lineWidth = 12; ctx.out.stroke()
-    ctx.out.strokeStyle = 'rgb(33,180,251)'; ctx.out.lineWidth = 5; ctx.out.stroke()
+    ctx.out.strokeStyle = 'rgb(200,200,200)'; ctx.out.lineWidth = borderWidth; ctx.out.stroke()
+    ctx.out.strokeStyle = 'rgb(33,180,251)'; ctx.out.lineWidth = colorWidth; ctx.out.stroke()
   }
 
   ctx.left.translate(maxR, maxR); ctx.left.rotate(Math.PI / 2); ctx.left.translate(-maxR, -maxR)
@@ -94,8 +96,8 @@ function createArrows() {
     ctx.left.arc(maxR, maxR, maxR * 0.85, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
     ctx.left.arc(maxR, maxR, maxR * 0.90, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
     ctx.left.arc(maxR, maxR, maxR * 0.95, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
-    ctx.left.strokeStyle = 'rgb(200,200,200)'; ctx.left.lineWidth = 12; ctx.left.stroke()
-    ctx.left.strokeStyle = 'rgb(246,159,55)'; ctx.left.lineWidth = 5; ctx.left.stroke()
+    ctx.left.strokeStyle = 'rgb(200,200,200)'; ctx.left.lineWidth = borderWidth; ctx.left.stroke()
+    ctx.left.strokeStyle = 'rgb(246,159,55)'; ctx.left.lineWidth = colorWidth; ctx.left.stroke()
   }
 
   ctx.right.translate(maxR, maxR); ctx.right.rotate(Math.PI / 2); ctx.right.translate(-maxR, -maxR)
@@ -104,8 +106,8 @@ function createArrows() {
     ctx.right.arc(maxR, maxR, maxR * 0.85, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
     ctx.right.arc(maxR, maxR, maxR * 0.90, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
     ctx.right.arc(maxR, maxR, maxR * 0.95, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
-    ctx.right.strokeStyle = 'rgb(200,200,200)'; ctx.right.lineWidth = 12; ctx.right.stroke()
-    ctx.right.strokeStyle = 'rgb(98,251,43)'; ctx.right.lineWidth = 5; ctx.right.stroke()
+    ctx.right.strokeStyle = 'rgb(200,200,200)'; ctx.right.lineWidth = borderWidth; ctx.right.stroke()
+    ctx.right.strokeStyle = 'rgb(98,251,43)'; ctx.right.lineWidth = colorWidth; ctx.right.stroke()
   }
 }
 
@@ -419,6 +421,7 @@ const drawCount = {
   frame: 0,
   actualFrame: 0,
 }
+let currentSectionDiv = stats.parentNode.insertBefore(document.createElement('div'), stats)
 setInterval(() => {
   stats.textContent = [
     `frame draw: ${drawCount.frame}`,
@@ -432,6 +435,7 @@ let startTs = 0
 let startNextFrame = false
 let currentTs = 0
 let currentDistance = 0;
+let currentSection = 0;
 let playing = false;
 let sfl = 1
 let sflOffset = 0
@@ -465,6 +469,9 @@ function render(now) {
   if (enableBga) {
     ctx.fillStyle = 'rgba(0,0,0,0.8)'
     ctx.fill()
+  } else {
+    ctx.fillStyle = 'rgba(32,32,32,0.8)'
+    ctx.fill()
   }
 
   // lanes
@@ -473,7 +480,7 @@ function render(now) {
   laneGradient.addColorStop(0.1, 'rgba(128,128,128,0)');
   laneGradient.addColorStop(0.2, 'rgba(128,128,128,0.3)');
   laneGradient.addColorStop(1, 'rgba(128,128,128,0.8)');
-  ctx.lineWidth = 1
+  ctx.lineWidth = 1 * devicePixelRatio
   ctx.strokeStyle = laneGradient
   ctx.beginPath();
   for (let i=0; i<30; i++) {
@@ -518,6 +525,12 @@ function render(now) {
     }
     currentDistance = (calcBaseTs - sflTsList[sflOffset].timestamp) * sfl + sflTsList[sflOffset].distance
   }
+
+  if (noteListForPlayback.length) {
+    currentSection = noteListForPlayback.filter(i => i.noteType === 'sectionSep' && i.timestamp <= currentTs).pop().section
+  }
+  currentSectionDiv.textContent = `current section: ${currentSection}`
+
   updateLaneOnState(previousTs, currentTs)
   // black out "off" lanes
   const laneBgGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxR)
@@ -538,7 +551,7 @@ function render(now) {
     ctx.lineTo(centerX, centerY)
   }
   ctx.fill()
-  const notesToRenderArr = getNotesForDraw(currentDistance, drawDistance)
+  const notesToRenderArr = getNotesForDraw(currentDistance, drawDistance).filter(i => i.timestamp >= currentTs)
   notesToRender = {
     sectionSep: [],
     touch: [],
@@ -586,10 +599,11 @@ function render(now) {
   })
 
   if (notesToRender.sectionSep.length) {
-    ctx.lineWidth = 1.5
-    ctx.strokeStyle = '#555'
+    const thicc = 0.5 * devicePixelRatio
+    ctx.strokeStyle = '#BBB'
     notesToRender.sectionSep.forEach(i => {
-      const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
+      const r = distanceToRenderRadius(maxR, (i.distance - currentDistance) / RENDER_DISTANCE)
+      ctx.lineWidth = (r * 6 / maxR + 0.5) * thicc
       ctx.beginPath()
       ctx.arc(
         centerX, centerY,
@@ -627,7 +641,7 @@ function render(now) {
         actualEndWidth = (endWidth - startWidth) * (currentDistance + RENDER_DISTANCE - startDistance) / (endDistance - startDistance) + endWidth
         actualEndDistance = currentDistance + RENDER_DISTANCE
       }
-      const r = maxR * Math.pow(1 - Math.max(actualStartDistance - currentDistance, 0) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
+      const r = distanceToRenderRadius(maxR, Math.max(actualStartDistance - currentDistance, 0) / RENDER_DISTANCE)
       const start = 60 - actualStartOffset - actualStartWidth, end = 60 - actualStartOffset
       ctx.beginPath()
       ctx.arc(
@@ -635,7 +649,7 @@ function render(now) {
         r,
         Math.PI * (start / 30), Math.PI * (end / 30)
       )
-      const r2 = maxR * Math.pow(1 - Math.min(actualEndDistance - currentDistance, RENDER_DISTANCE) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
+      const r2 = distanceToRenderRadius(maxR, Math.min(actualEndDistance - currentDistance, RENDER_DISTANCE) / RENDER_DISTANCE)
       const start2 = 60 - actualEndOffset - actualEndWidth, end2 = 60 - actualEndOffset
       ctx.arc(
         centerX, centerY,
@@ -682,12 +696,12 @@ function render(now) {
   // blue extend for same time notes
   {
     const key = 'sameTime', color = 'rgb(80,255,250)'
-    const thicc = 3
+    const thicc = 4 * devicePixelRatio
     if (notesToRender[key].length) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
-        const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
-        ctx.lineWidth = (r * 5 / maxR + 2) * thicc
+        const r = distanceToRenderRadius(maxR, (i.distance - currentDistance) / RENDER_DISTANCE)
+        ctx.lineWidth = (r * 6 / maxR + 0.5) * thicc
         const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
         ctx.beginPath()
         ctx.arc(
@@ -703,12 +717,12 @@ function render(now) {
   // white border for R notes
   {
     const key = 'R', color = 'rgb(255,255,255)'
-    const thicc = 4
+    const thicc = 5 * devicePixelRatio
     if (notesToRender[key].length) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
-        const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
-        ctx.lineWidth = (r * 5 / maxR + 2) * thicc
+        const r = distanceToRenderRadius(maxR, (i.distance - currentDistance) / RENDER_DISTANCE)
+        ctx.lineWidth = (r * 6 / maxR + 0.5) * thicc
         const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
         const cutOut = i.noteWidth < 60 ? 0.01 : 0
         ctx.beginPath()
@@ -733,12 +747,12 @@ function render(now) {
   ]
   colorMap.forEach(noteType => {
     const key = noteType[0], color = noteType[1]
-    const thicc = ['flickL','flickR','snapIn','snapOut'].indexOf(key) === -1 ? 1.5 : 2
+    const thicc = (['flickL','flickR','snapIn','snapOut'].indexOf(key) === -1 ? 2.25 : 3) * devicePixelRatio
     if (notesToRender[key].length) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
-        const r = maxR * Math.pow(1 - (i.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
-        ctx.lineWidth = (r * 5 / maxR + 2) * thicc
+        const r = distanceToRenderRadius(maxR, (i.distance - currentDistance) / RENDER_DISTANCE)
+        ctx.lineWidth = (r * 6 / maxR + 0.5) * thicc
         const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
         const cutOut = i.noteWidth < 60 ? 0.03 : 0
         ctx.beginPath()
@@ -755,7 +769,7 @@ function render(now) {
   if (notesToRender.arrow.length) {
     for (let i=notesToRender.arrow.length-1; i>=0; i--) {
       const a = notesToRender.arrow[i]
-      const r = maxR * Math.pow(1 - (a.distance - currentDistance) / RENDER_DISTANCE * NOTE_APPEAR_DISTANCE, NOTE_SPEED_POWER)
+      const r = distanceToRenderRadius(maxR*0.95, (a.distance - currentDistance) / RENDER_DISTANCE)
       const start = 60 - a.laneOffset - a.noteWidth, end = 60 - a.laneOffset
       ctx.save()
       ctx.beginPath()
@@ -796,7 +810,7 @@ function render(now) {
     }
     ctx.strokeStyle = 'rgba(0,0,0,0.3)'
     const r = maxR * 0.98
-    ctx.lineWidth = (r * 5 / maxR + 2)
+    ctx.lineWidth = (r * 5 / maxR + 2) * devicePixelRatio
     ctx.beginPath()
     ctx.arc(
       centerX, centerY,
@@ -805,6 +819,14 @@ function render(now) {
     )
     ctx.stroke()
   }
+}
+const CALC_CONE_HEIGHT = 5
+const CALC_CONE_RADIUS = 2
+function distanceToRenderRadius (maxR, distance) {
+  let h = distance * CALC_CONE_HEIGHT
+  let a = (1 - distance) * CALC_CONE_RADIUS
+  let angle = Math.atan(h / a) * 2 / Math.PI
+  return maxR * (1 - angle)
 }
 window.play = function () {
   startNextFrame = true
@@ -944,6 +966,7 @@ speed_input.addEventListener('change', e => {
   const speed = speed_input.value / 10
   speed_val.textContent = speed
   RENDER_DISTANCE = 3000 / speed
+  drawForNextFrame = true
 })
 function resize() {
   const w = Math.round(window.innerWidth * devicePixelRatio), h = Math.round(window.innerHeight * devicePixelRatio)

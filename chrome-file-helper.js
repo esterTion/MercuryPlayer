@@ -11,6 +11,11 @@ if (/^file:\/\/\//.test(location.href) && /chrome/i.test(navigator.userAgent)) {
             ['error', 'abort'].forEach((event) => { request.addEventListener(event, fail); });
 
             let pull = (expected) => (new Promise((resolve, reject) => {
+                if (expected == 'json') {
+                    try {
+                        resolve(JSON.parse(request.response))
+                    } catch(e) {}
+                }
                 if (
                     request.responseType == expected ||
                     (expected == 'text' && !request.responseType)
