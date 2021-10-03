@@ -5,11 +5,15 @@
   <title>MercuryPlayer</title>
   <style>html{background:black;font-family:Meiryo}select,option{-moz-font:-moz-pull-down-menu;font-family:Meiryo}canvas{position:fixed;left:0;top:0;height:100vh;width:100vw}</style>
   <style>video{position:fixed;mask-size:100%;mask-image:url('data:image/svg+xml,%3Csvg height%3D"2" width%3D"2" version%3D"1.1" xmlns%3D"http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg"%3E%3Cellipse style%3D"fill%3A%23000" cx%3D"1" cy%3D"1" rx%3D"1" ry%3D"1"%2F%3E%3C%2Fsvg%3E')}</style>
+  <style>.hide-control div:not(.no-hide) {opacity:0}</style>
+  <style>.long-audio audio {width:1000px}</style>
 </head>
 
 <video src="../../../../mv_S02_218_40534656.mp4" preload id="bga"></video>
 <canvas id="canvas"></canvas>
-<div style="position:fixed;left:5px;bottom:5px;color:white">
+<div style="position:fixed;left:5px;bottom:5px;color:white" class="no-hide">
+  <div class="no-hide"><label><input type="checkbox" id="toggle_ui" autocomplete="off"><span>Hide UI</span></label></div>
+  <div><label><input type="checkbox" id="toggle_long_audio" autocomplete="off"><span>Long audio</span></label></div>
   <div style="white-space:pre-wrap" id="stats"></div>
   <div style="display:none"><select id="music_select"></select><br><select id="diffi_select"><option value="0">Normal</option><option value="1">Hard</option><option value="2" selected>Expert</option><option value="3">Inferno</option></select>　<input type="button" value="Load" onclick="loadUsingSelect()"></div>
   <div><input id="music_file" name="mer_file" type="file" accept=".mer" value=".mer path..."/>　<input id="bgm_file" name="mer_bgm_file" type="file" accept="audio/*" placeholder="sound file path..."/>　<input type="button" value="Load" onclick="loadUsingFile()"></div>

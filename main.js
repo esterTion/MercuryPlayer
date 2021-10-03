@@ -422,6 +422,12 @@ const drawCount = {
   actualFrame: 0,
 }
 let currentSectionDiv = stats.parentNode.insertBefore(document.createElement('div'), stats)
+toggle_ui.addEventListener('input', () => {
+  document.body.classList[toggle_ui.checked ? 'add' : 'remove']('hide-control')
+})
+toggle_long_audio.addEventListener('input', () => {
+  document.body.classList[toggle_long_audio.checked ? 'add' : 'remove']('long-audio')
+})
 setInterval(() => {
   stats.textContent = [
     `frame draw: ${drawCount.frame}`,
