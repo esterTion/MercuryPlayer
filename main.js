@@ -826,13 +826,13 @@ function render(now) {
     ctx.stroke()
   }
 }
-const CALC_CONE_HEIGHT = 5
-const CALC_CONE_RADIUS = 2
+let CALC_CONE_HEIGHT = 6
+let CALC_CONE_RADIUS = 2
 function distanceToRenderRadius (maxR, distance) {
-  let h = distance * CALC_CONE_HEIGHT
+  let h = distance * CALC_CONE_HEIGHT + CALC_CONE_RADIUS
   let a = (1 - distance) * CALC_CONE_RADIUS
   let angle = Math.atan(h / a) * 2 / Math.PI
-  return maxR * (1 - angle)
+  return maxR * (1 - angle) * 2
 }
 window.play = function () {
   startNextFrame = true
