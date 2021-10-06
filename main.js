@@ -45,10 +45,9 @@ let sflTsList = []
 let laneToggleList = []
 let idOffsetMap = []
 let prevIdMap = {}
-let startedHoldList = {}
-let startedHoldReverseList = {}
 let chartHeader = {}
 let reverseSection = []
+let holdList = []
 
 const arrowCanvas = {
   in: document.createElement('canvas'),
@@ -213,10 +212,9 @@ function parseNotesFromText(text) {noteList = [];
   sflTsList = []
   idOffsetMap = []
   prevIdMap = {}
-  startedHoldList = {}
-  startedHoldReverseList = {}
   chartHeader = {}
   reverseSection = []
+  holdList = []
   const controlDupFix = {}
 
   const lines = text.trim().replace(/ +/g, '\t').split('\n');
@@ -391,8 +389,32 @@ function parseNotesFromText(text) {noteList = [];
           holdChain[k].noteWidth = (endWidth - startWidth) * (k - startIndex) / segments + startWidth
         }
       }
+
+      let distanceMax = 0, distanceMin = Infinity
+      let timeStamp = Infinity, timeStampEnd = 0
+      const hold = {
+        nodes: holdChain.map(i => {
+          distanceMax = Math.max(i.distance, distanceMax)
+          distanceMin = Math.min(i.distance, distanceMin)
+          timeStamp = Math.min(i.timestamp, timeStamp)
+          timeStampEnd = Math.max(i.timestamp, timeStampEnd)
+          return {
+            distance: i.distance,
+            timestamp: i.timestamp,
+            laneOffset: i.laneOffset,
+            noteWidth: i.noteWidth
+          }
+        }),
+        distanceMin,
+        distanceMax,
+        timeStamp,
+        timeStampEnd,
+      }
+      holdList.push(hold)
     }
   })
+  // remove hold node & end from list
+  noteListForPlayback = noteListForPlayback.filter(i => i.noteType !== '10' && i.noteType !== '11')
 
   // reverse section
   const reverseStartList = controlList.filter(i => i.cmdType === '6')
@@ -619,83 +641,69 @@ function render(now) {
       ctx.stroke()
     })
   }
-  const startedHoldListKeys = Object.keys(startedHoldList)
-  if (notesToRender.holdBody.length || startedHoldListKeys.length) {
-    const drawnHold = {}
-    const drawHoldForId = id => {
-      if (drawnHold[id]) return
-      drawnHold[id] = true
-      const i = noteListForPlayback[idOffsetMap[id]]
-      const nextPart = noteListForPlayback[idOffsetMap[i.extParam2]]
-      if (nextPart == undefined) return
-      const startDistance = i.distance, endDistance = nextPart.distance
-      if (endDistance < currentDistance) return
-      if (startDistance > currentDistance + RENDER_DISTANCE) return
-      let startOffset = i.laneOffset, endOffset = nextPart.laneOffset
-      //if (startOffset == 59 && endOffset == 0) endOffset = 60
-      //else if (startOffset == 0 && endOffset == 59) startOffset = 60
-
-      let startWidth = i.noteWidth, endWidth = nextPart.noteWidth
-      let actualStartOffset = startOffset, actualStartWidth = startWidth, actualStartDistance = i.distance, actualEndOffset = endOffset, actualEndWidth = endWidth, actualEndDistance = nextPart.distance
-      if (actualStartDistance < currentDistance) {
-        actualStartOffset = (endOffset - startOffset) * (currentDistance - startDistance) / (endDistance - startDistance) + startOffset
-        actualStartWidth = (endWidth - startWidth) * (currentDistance - startDistance) / (endDistance - startDistance) + startWidth
-        actualStartDistance = currentDistance
-      }
-      if (actualEndDistance > currentDistance + RENDER_DISTANCE) {
-        actualEndOffset = (endOffset - startOffset) * (currentDistance + RENDER_DISTANCE - startDistance) / (endDistance - startDistance) + endOffset
-        actualEndWidth = (endWidth - startWidth) * (currentDistance + RENDER_DISTANCE - startDistance) / (endDistance - startDistance) + endWidth
-        actualEndDistance = currentDistance + RENDER_DISTANCE
-      }
-      const r = distanceToRenderRadius(maxR, Math.max(actualStartDistance - currentDistance, 0) / RENDER_DISTANCE)
-      const start = 60 - actualStartOffset - actualStartWidth, end = 60 - actualStartOffset
+  {
+    const drawHoldList = getHoldsForDraw(currentDistance, currentTs, drawDistance);
+    ctx.fillStyle = 'rgba(207,162,93, 0.7)'
+    drawHoldList.forEach(nodes => {
       ctx.beginPath()
-      ctx.arc(
-        centerX, centerY,
-        r,
-        Math.PI * (start / 30), Math.PI * (end / 30)
-      )
-      const r2 = distanceToRenderRadius(maxR, Math.min(actualEndDistance - currentDistance, RENDER_DISTANCE) / RENDER_DISTANCE)
-      const start2 = 60 - actualEndOffset - actualEndWidth, end2 = 60 - actualEndOffset
-      ctx.arc(
-        centerX, centerY,
-        r2,
-        Math.PI * (end2 / 30), Math.PI * (start2 / 30),
-        true
-      )
+      const nodeCount = nodes.length
+      if (nodes[0].distance < currentDistance) { // clip to outer ring
+        let clipDistance = currentDistance
+        let clipOffset = (nodes[1].laneOffset - nodes[0].laneOffset) * (clipDistance - nodes[0].distance) / (nodes[1].distance - nodes[0].distance) + nodes[0].laneOffset
+        let clipWidth = (nodes[1].noteWidth - nodes[0].noteWidth) * (clipDistance - nodes[0].distance) / (nodes[1].distance - nodes[0].distance) + nodes[0].noteWidth
+        nodes[0] = {
+          distance: clipDistance,
+          laneOffset: clipOffset,
+          noteWidth: clipWidth,
+        }
+      }
+      if (nodes[nodeCount - 1].distance > currentDistance+RENDER_DISTANCE) { // clip to center
+        let clipDistance = currentDistance+RENDER_DISTANCE
+        let clipOffset = (nodes[nodeCount - 1].laneOffset - nodes[nodeCount - 2].laneOffset) * (clipDistance - nodes[nodeCount - 2].distance) / (nodes[nodeCount - 1].distance - nodes[nodeCount - 2].distance) + nodes[nodeCount - 2].laneOffset
+        let clipWidth = (nodes[nodeCount - 1].noteWidth - nodes[nodeCount - 2].noteWidth) * (clipDistance - nodes[nodeCount - 2].distance) / (nodes[nodeCount - 1].distance - nodes[nodeCount - 2].distance) + nodes[nodeCount - 2].noteWidth
+        nodes[nodeCount - 1] = {
+          distance: clipDistance,
+          laneOffset: clipOffset,
+          noteWidth: clipWidth,
+        }
+      }
+      for (let i=0; i<nodeCount-1; i++) {
+        const r = distanceToRenderRadius(maxR, Math.max(nodes[i].distance - currentDistance, 0) / RENDER_DISTANCE)
+        const start = 60 - nodes[i].laneOffset - nodes[i].noteWidth, end = 60 - nodes[i].laneOffset
+        if (i === 0) {
+          ctx.arc(
+            centerX, centerY,
+            r,
+            Math.PI * (start / 30), Math.PI * (end / 30)
+          )
+        } else {
+          ctx.arc(
+            centerX, centerY,
+            r,
+            Math.PI * (end / 30), Math.PI * (end / 30)
+          )
+        }
+      }
+      for (let i=nodeCount-1; i>=0; i--) {
+        const r = distanceToRenderRadius(maxR, Math.min(nodes[i].distance - currentDistance, RENDER_DISTANCE) / RENDER_DISTANCE)
+        const start = 60 - nodes[i].laneOffset - nodes[i].noteWidth, end = 60 - nodes[i].laneOffset
+        if (i === nodeCount-1) {
+          ctx.arc(
+            centerX, centerY,
+            r,
+            Math.PI * (end / 30), Math.PI * (start / 30),
+            true
+          )
+        } else {
+          ctx.arc(
+            centerX, centerY,
+            r,
+            Math.PI * (start / 30), Math.PI * (start / 30)
+          )
+        }
+      }
       ctx.closePath()
       ctx.fill()
-    }
-    ctx.fillStyle = 'rgba(207,162,93, 0.7)'
-    notesToRender.holdBody.forEach(i => {
-      if (i.noteType == '9' || i.noteType == '25') {
-        let endId = i.id
-        let hold = noteListForPlayback[idOffsetMap[endId]]
-        while (hold.noteType !== '11') {
-          drawHoldForId(hold.id)
-          endId = hold.extParam2
-          hold = noteListForPlayback[idOffsetMap[endId]]
-        }
-        startedHoldList[i.id] = endId
-        startedHoldReverseList[endId] = i.id
-      } else {
-        drawHoldForId(prevIdMap[i.id])
-        drawHoldForId(i.id)
-      }
-    })
-    startedHoldListKeys.forEach(id => {
-      let hold = noteListForPlayback[idOffsetMap[id]]
-      while (hold.noteType !== '11') {
-        if (hold.distance > currentDistance + RENDER_DISTANCE) return
-        drawHoldForId(hold.id)
-        id = hold.extParam2
-        hold = noteListForPlayback[idOffsetMap[id]]
-      }
-      if (hold.distance < currentDistance) {
-        const startId = startedHoldReverseList[id]
-        delete startedHoldList[startId]
-        delete startedHoldReverseList[id]
-      }
     })
   }
 
@@ -853,8 +861,6 @@ window.stop = function () {
   currentTs = 0
   bgm.currentTime = 0
   if (enableBga) bga.currentTime = 0
-  startedHoldList = {}
-  startedHoldReverseList = {}
   drawForNextFrame = true
   sflOffset = 0
   sfl = 1
@@ -902,6 +908,44 @@ function getNotesForDraw(currentDistance, renderDistance = RENDER_DISTANCE) {
   .filter(i => i.distance > currentDistance && i.distance < currentDistance + renderDistance)
 }
 window.getNotesForDraw = getNotesForDraw;
+function getHoldsForDraw(currentDistance, currentTs, renderDistance = RENDER_DISTANCE) {
+  const filteredHoldList = holdList.filter(i => (
+    (i.distanceMax > currentDistance || i.distanceMin < currentDistance + renderDistance) && i.timeStampEnd > currentTs
+  ))
+  const drawHoldList = []
+  filteredHoldList.forEach(hold => {
+    let offset = 0
+    let head = 0, tail = 1
+    const nodeCount = hold.nodes.length
+    while (offset < nodeCount) {
+      if (hold.nodes[offset].distance < currentDistance) { // after leave, set head to last one before leaving current render
+        head = offset
+      } else if (hold.nodes[offset].distance > currentDistance + renderDistance) { // before enter, set tail to first one before enter render
+        tail = offset
+        if (tail-head > 0) drawHoldList.push(hold.nodes.slice(head, tail + 1))
+        head = offset + 1
+        tail = offset + 2
+      } else if (offset === nodeCount - 1) { // last one in chain
+        tail = offset
+        if (tail-head > 0) drawHoldList.push(hold.nodes.slice(head, tail + 1))
+      } else if (offset > 0 && offset < nodeCount - 1) { // not first or last one in chain, if change render direction (due to sfl), break render chain
+        if (hold.nodes[offset].distance > hold.nodes[offset - 1].distance && hold.nodes[offset].distance > hold.nodes[offset + 1].distance) {
+          tail = offset
+          if (tail-head > 0) drawHoldList.push(hold.nodes.slice(head, tail + 1))
+          head = offset
+        } else if (hold.nodes[offset].distance < hold.nodes[offset - 1].distance && hold.nodes[offset].distance < hold.nodes[offset + 1].distance) {
+          tail = offset
+          if (tail-head > 0) drawHoldList.push(hold.nodes.slice(head, tail + 1))
+          head = offset
+        }
+      }
+      offset++
+    }
+  })
+  return drawHoldList.filter(i => (
+    i[i.length - 1].timestamp > currentTs
+  ))
+}
 
 const pendingLaneChange = []
 const transitionLength = 80
@@ -963,8 +1007,6 @@ bgm.addEventListener('seeked', function (e) {
   currentTs = Math.round(this.currentTime * 1000)
   if (enableBga) bga.currentTime = this.currentTime
   startNextFrame = true
-  startedHoldList = {}
-  startedHoldReverseList = {}
 })
 bgm.addEventListener('pause', pause)
 bgm.addEventListener('play', play)
