@@ -48,6 +48,8 @@ let prevIdMap = {}
 let chartHeader = {}
 let reverseSection = []
 let holdList = []
+let seTrigger = []
+let pendingSeTrigger = []
 
 const arrowCanvas = {
   in: document.createElement('canvas'),
@@ -160,6 +162,17 @@ fetch('Table/music_info.json').then(r=>r.json()).then(r => {
 }).catch(e => {
   console.error('failed loading music table', e)
 })
+const seContext = new AudioContext
+let seBuffer = null
+fetch('59.adx.wav').then(r => r.arrayBuffer()).then(r => {
+  seContext.decodeAudioData(r, buf => {
+    if (buf) {
+      seBuffer = buf
+    } else {
+      console.error('decode failed')
+    }
+  }, e => console.error(e))
+})
 function loadUsingSelect() {
   const id = music_select.value | 0
   const diffi = diffi_select.value | 0
@@ -215,6 +228,7 @@ function parseNotesFromText(text) {noteList = [];
   chartHeader = {}
   reverseSection = []
   holdList = []
+  seTrigger = []
   const controlDupFix = {}
 
   const lines = text.trim().replace(/ +/g, '\t').split('\n');
@@ -415,7 +429,7 @@ function parseNotesFromText(text) {noteList = [];
     }
   })
   // remove hold node & end from list
-  noteListForPlayback = noteListForPlayback.filter(i => i.noteType !== '10' && i.noteType !== '11')
+  noteListForPlayback = noteListForPlayback.filter(i => i.noteType !== '10')
 
   // reverse section
   const reverseStartList = controlList.filter(i => i.cmdType === '6')
@@ -438,6 +452,8 @@ function parseNotesFromText(text) {noteList = [];
     if (!window.noteTypes[i.noteType]) window.noteTypes[i.noteType] = []
     window.noteTypes[i.noteType].push(i)
   })
+
+  seTrigger = Object.keys(noteListForPlayback.filter(i=>['10','12','13','14','sectionSep'].indexOf(i.noteType) === -1).map(i => i.timestamp).reduce((v,i) => (v[Math.round(i)]=1,v), {})).map(i => parseInt(i)).sort((a,b)=>(a-b))
 }
 
 const drawCount = {
@@ -834,6 +850,19 @@ function render(now) {
     )
     ctx.stroke()
   }
+
+  {
+    while (pendingSeTrigger.length && pendingSeTrigger[0] - currentTs < 40) {
+      if (!seBuffer) break
+      if (pendingSeTrigger[0] - currentTs > -25) {
+        let bufSrc = seContext.createBufferSource()
+        bufSrc.buffer = seBuffer
+        bufSrc.connect(gain)
+        bufSrc.start(Math.max(0, pendingSeTrigger[0] - currentTs) / 1000)
+      }
+      pendingSeTrigger.shift()
+    }
+  }
 }
 let CALC_CONE_HEIGHT = 6
 let CALC_CONE_RADIUS = 2
@@ -850,6 +879,7 @@ window.play = function () {
   bga.muted = true
   currentTs = Math.round(bgm.currentTime * 1000)
   playing = true
+  pendingSeTrigger = seTrigger.filter(i => i > currentTs)
 }
 window.pause = function () {
   bgm.pause()
@@ -1041,5 +1071,32 @@ function resize() {
 }
 window.addEventListener('resize', resize)
 resize();
+
+let gain = seContext.createGain()
+gain.connect(seContext.destination);
+for (let i=0; i<11; i++) {
+  let option = document.createElement('option')
+  option.setAttribute('value', i * 10)
+  option.textContent = i * 10
+  se_volume.appendChild(option)
+}
+se_volume.value = 100
+se_volume.addEventListener('change', () => {
+  gain.gain.value = se_volume.value / 100
+})
+se_file.addEventListener('change', () => {
+  const reader = new FileReader()
+  reader.readAsArrayBuffer(se_file.files[0])
+  reader.onload = e => {
+    seContext.decodeAudioData(reader.result, buf => {
+      if (buf) {
+        seBuffer = buf
+      } else {
+        console.error('decode failed')
+      }
+    }, e => console.error(e))
+  }
+})
+
 
 //})
