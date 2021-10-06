@@ -382,11 +382,12 @@ function parseNotesFromText(text) {noteList = [];
       //console.log(holdChain, changePoint)
       for (let j = 0; j < changePoint.length - 1; j++) {
         const startIndex = changePoint[j], endIndex = changePoint[j + 1], segments = endIndex - startIndex
-        const startOffset = holdChain[startIndex].laneOffset, startWidth = holdChain[startIndex].noteWidth
-        const endOffset = holdChain[endIndex].laneOffset, endWidth = holdChain[endIndex].noteWidth
+        const startOffset = holdChain[startIndex].laneOffset, startWidth = holdChain[startIndex].noteWidth, startDistance = holdChain[startIndex].distance
+        const endOffset = holdChain[endIndex].laneOffset, endWidth = holdChain[endIndex].noteWidth, endDistance = holdChain[endIndex].distance
         for (let k = startIndex + 1; k < endIndex; k++) {
           holdChain[k].laneOffset = (endOffset - startOffset) * (k - startIndex) / segments + startOffset
           holdChain[k].noteWidth = (endWidth - startWidth) * (k - startIndex) / segments + startWidth
+          holdChain[k].distance = (endDistance - startDistance) * (k - startIndex) / segments + startDistance
         }
       }
 
