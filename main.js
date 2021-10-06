@@ -50,6 +50,8 @@ let reverseSection = []
 let holdList = []
 let seTrigger = []
 let pendingSeTrigger = []
+let seRTrigger = []
+let pendingSeRTrigger = []
 
 const arrowCanvas = {
   in: document.createElement('canvas'),
@@ -173,6 +175,16 @@ fetch('59.adx.wav').then(r => r.arrayBuffer()).then(r => {
     }
   }, e => console.error(e))
 })
+let seRBuffer = null
+fetch('232.adx.wav').then(r => r.arrayBuffer()).then(r => {
+  seContext.decodeAudioData(r, buf => {
+    if (buf) {
+      seRBuffer = buf
+    } else {
+      console.error('decode failed')
+    }
+  }, e => console.error(e))
+})
 function loadUsingSelect() {
   const id = music_select.value | 0
   const diffi = diffi_select.value | 0
@@ -229,6 +241,7 @@ function parseNotesFromText(text) {noteList = [];
   reverseSection = []
   holdList = []
   seTrigger = []
+  seRTrigger = []
   const controlDupFix = {}
 
   const lines = text.trim().replace(/ +/g, '\t').split('\n');
@@ -453,6 +466,7 @@ function parseNotesFromText(text) {noteList = [];
     window.noteTypes[i.noteType].push(i)
   })
 
+  seRTrigger = Object.keys(noteListForPlayback.filter(i=>['20','21','22','23','24','25','26'].indexOf(i.noteType) !== -1).map(i => i.timestamp).reduce((v,i) => (v[Math.round(i)]=1,v), {})).map(i => parseInt(i)).sort((a,b)=>(a-b))
   seTrigger = Object.keys(noteListForPlayback.filter(i=>['10','12','13','14','sectionSep'].indexOf(i.noteType) === -1).map(i => i.timestamp).reduce((v,i) => (v[Math.round(i)]=1,v), {})).map(i => parseInt(i)).sort((a,b)=>(a-b))
 }
 
@@ -862,6 +876,16 @@ function render(now) {
       }
       pendingSeTrigger.shift()
     }
+    while (pendingSeRTrigger.length && pendingSeRTrigger[0] - currentTs < 40) {
+      if (!seRBuffer) break
+      if (pendingSeRTrigger[0] - currentTs > -25) {
+        let bufSrc = seContext.createBufferSource()
+        bufSrc.buffer = seRBuffer
+        bufSrc.connect(gain)
+        bufSrc.start(Math.max(0, pendingSeRTrigger[0] - currentTs) / 1000)
+      }
+      pendingSeRTrigger.shift()
+    }
   }
 }
 let CALC_CONE_HEIGHT = 6
@@ -880,6 +904,7 @@ window.play = function () {
   currentTs = Math.round(bgm.currentTime * 1000)
   playing = true
   pendingSeTrigger = seTrigger.filter(i => i > currentTs)
+  pendingSeRTrigger = seRTrigger.filter(i => i > currentTs)
 }
 window.pause = function () {
   bgm.pause()
