@@ -364,7 +364,7 @@ function parseNotesFromText(text) {noteList = [];
   const sflList = controlList.filter(i => i.cmdType === '5')
   noteNo = 0;
   let distanceOffset = 0;
-  sflList.unshift({tickTotal:0, value1:1, timestamp:0})
+  sflList.unshift({tickTotal:-999999, value1:1, timestamp:-999999})
   // convert milli second to distance(?) for chart speed control
   for (let i = 0; i < sflList.length; i++) {
     const currentSfl = sflList[i]
@@ -397,6 +397,7 @@ function parseNotesFromText(text) {noteList = [];
       const changePoint = [0]
       let prevOffset = i.laneOffset
       let laneOffsetAdjust = 0
+      let acrossMinusSfl = false
       while (i.noteType !== '11') {
         i = noteListForPlayback[idOffsetMap[i.extParam2]]
         if (i.extParam1 === 1) changePoint.push(holdChain.length)
@@ -406,7 +407,12 @@ function parseNotesFromText(text) {noteList = [];
         prevOffset = i.laneOffset
         i.laneOffset += laneOffsetAdjust
       }
-      //console.log(holdChain, changePoint)
+      for (let j = 1; j < holdChain.length - 1; j++) {
+        if (holdChain[j].distance > holdChain[j-1].distance && holdChain[j].distance > holdChain[j+1].distance) {
+          acrossMinusSfl = true
+          break
+        }
+      }
       for (let j = 0; j < changePoint.length - 1; j++) {
         const startIndex = changePoint[j], endIndex = changePoint[j + 1], segments = endIndex - startIndex
         const startOffset = holdChain[startIndex].laneOffset, startWidth = holdChain[startIndex].noteWidth, startDistance = holdChain[startIndex].distance
@@ -414,7 +420,7 @@ function parseNotesFromText(text) {noteList = [];
         for (let k = startIndex + 1; k < endIndex; k++) {
           holdChain[k].laneOffset = (endOffset - startOffset) * (k - startIndex) / segments + startOffset
           holdChain[k].noteWidth = (endWidth - startWidth) * (k - startIndex) / segments + startWidth
-          holdChain[k].distance = (endDistance - startDistance) * (k - startIndex) / segments + startDistance
+          if (acrossMinusSfl) holdChain[k].distance = (endDistance - startDistance) * (k - startIndex) / segments + startDistance
         }
       }
 
@@ -565,9 +571,9 @@ function render(now) {
       }
       updateLaneOnState(-1, currentTs)
     }
-    if (!(currentTs > sflTsList[sflOffset].timestamp && (sflOffset === sflTsList.length - 1 || currentTs <= sflTsList[sflOffset + 1].timestamp))) {
+    if (!(currentTs >= sflTsList[sflOffset].timestamp && (sflOffset === sflTsList.length - 1 || currentTs <= sflTsList[sflOffset + 1].timestamp))) {
       for (sflOffset = 0; sflOffset < sflTsList.length - 1; sflOffset++) {
-        if (currentTs > sflTsList[sflOffset].timestamp && currentTs <= sflTsList[sflOffset + 1].timestamp) {
+        if (currentTs >= sflTsList[sflOffset].timestamp && currentTs <= sflTsList[sflOffset + 1].timestamp) {
           break;
         }
       }
@@ -905,6 +911,7 @@ window.play = function () {
   playing = true
   pendingSeTrigger = seTrigger.filter(i => i > currentTs)
   pendingSeRTrigger = seRTrigger.filter(i => i > currentTs)
+  seContext.resume()
 }
 window.pause = function () {
   bgm.pause()
