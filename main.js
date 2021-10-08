@@ -878,7 +878,7 @@ function render(now) {
         let bufSrc = seContext.createBufferSource()
         bufSrc.buffer = seBuffer
         bufSrc.connect(gain)
-        bufSrc.start(Math.max(0, pendingSeTrigger[0] - currentTs) / 1000)
+        bufSrc.start(seContext.currentTime + Math.max(0, pendingSeTrigger[0] - currentTs) / 1000)
       }
       pendingSeTrigger.shift()
     }
@@ -888,7 +888,7 @@ function render(now) {
         let bufSrc = seContext.createBufferSource()
         bufSrc.buffer = seRBuffer
         bufSrc.connect(gain)
-        bufSrc.start(Math.max(0, pendingSeRTrigger[0] - currentTs) / 1000)
+        bufSrc.start(seContext.currentTime + Math.max(0, pendingSeRTrigger[0] - currentTs) / 1000)
       }
       pendingSeRTrigger.shift()
     }
