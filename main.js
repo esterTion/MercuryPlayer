@@ -165,6 +165,8 @@ fetch('Table/music_info.json').then(r=>r.json()).then(r => {
   console.error('failed loading music table', e)
 })
 const seContext = new AudioContext
+const bgmSrc = seContext.createMediaElementSource(bgm)
+bgmSrc.connect(seContext.destination)
 let seBuffer = null
 fetch('59.adx.wav').then(r => r.arrayBuffer()).then(r => {
   seContext.decodeAudioData(r, buf => {
@@ -193,7 +195,9 @@ function loadUsingSelect() {
   stop()
   const strId = musicTable[id].AssetDirectory
   parseNotesFromFile(`MusicData/${strId}/${strId}_0${diffi}.mer`)
-  setBgm('Sound/Bgm/output/MER_BGM_'+strId.replace('-', '_')+'.m4a')
+  fetch('Sound/Bgm/output/MER_BGM_'+strId.replace('-', '_')+'.m4a').then(r => r.blob()).then(b => {
+    setBgm(URL.createObjectURL(b))
+  })
 }
 function loadUsingFile() {
   if (music_file.files.length && bgm_file.files.length) {
@@ -707,35 +711,37 @@ function render(now) {
       for (let i=0; i<nodeCount-1; i++) {
         const r = distanceToRenderRadius(maxR, Math.max(nodes[i].distance - currentDistance, 0) / RENDER_DISTANCE)
         const start = 60 - nodes[i].laneOffset - nodes[i].noteWidth, end = 60 - nodes[i].laneOffset
+        const gapWidth = nodes[i].noteWidth == 60 ? 0 : 0.01
         if (i === 0) {
           ctx.arc(
             centerX, centerY,
             r,
-            Math.PI * (start / 30), Math.PI * (end / 30)
+            Math.PI * (start / 30) + gapWidth, Math.PI * (end / 30) - gapWidth
           )
         } else {
           ctx.arc(
             centerX, centerY,
             r,
-            Math.PI * (end / 30), Math.PI * (end / 30)
+            Math.PI * (end / 30) - gapWidth, Math.PI * (end / 30) - gapWidth
           )
         }
       }
       for (let i=nodeCount-1; i>=0; i--) {
         const r = distanceToRenderRadius(maxR, Math.min(nodes[i].distance - currentDistance, RENDER_DISTANCE) / RENDER_DISTANCE)
         const start = 60 - nodes[i].laneOffset - nodes[i].noteWidth, end = 60 - nodes[i].laneOffset
+        const gapWidth = nodes[i].noteWidth == 60 ? 0 : 0.01
         if (i === nodeCount-1) {
           ctx.arc(
             centerX, centerY,
             r,
-            Math.PI * (end / 30), Math.PI * (start / 30),
+            Math.PI * (end / 30) - gapWidth, Math.PI * (start / 30) + gapWidth,
             true
           )
         } else {
           ctx.arc(
             centerX, centerY,
             r,
-            Math.PI * (start / 30), Math.PI * (start / 30)
+            Math.PI * (start / 30) + gapWidth, Math.PI * (start / 30) + gapWidth
           )
         }
       }
@@ -872,7 +878,7 @@ function render(now) {
   }
 
   {
-    while (pendingSeTrigger.length && pendingSeTrigger[0] - currentTs < 40) {
+    while (pendingSeTrigger.length && pendingSeTrigger[0] - currentTs < 100) {
       if (!seBuffer) break
       if (pendingSeTrigger[0] - currentTs > -25) {
         let bufSrc = seContext.createBufferSource()
@@ -882,7 +888,7 @@ function render(now) {
       }
       pendingSeTrigger.shift()
     }
-    while (pendingSeRTrigger.length && pendingSeRTrigger[0] - currentTs < 40) {
+    while (pendingSeRTrigger.length && pendingSeRTrigger[0] - currentTs < 100) {
       if (!seRBuffer) break
       if (pendingSeRTrigger[0] - currentTs > -25) {
         let bufSrc = seContext.createBufferSource()
@@ -911,6 +917,13 @@ window.play = function () {
   playing = true
   pendingSeTrigger = seTrigger.filter(i => i > currentTs)
   pendingSeRTrigger = seRTrigger.filter(i => i > currentTs)
+  bgm.addEventListener('timeupdate', function temp(e) {
+    bgm.removeEventListener('timeupdate', temp)
+    setTimeout(() => {
+      startNextFrame = true
+      currentTs = Math.round(bgm.currentTime * 1000)
+    }, 500)
+  })
   seContext.resume()
 }
 window.pause = function () {
