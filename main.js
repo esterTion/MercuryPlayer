@@ -58,12 +58,16 @@ const arrowCanvas = {
   out: document.createElement('canvas'),
   left: document.createElement('canvas'),
   right: document.createElement('canvas'),
+  leftRotation: document.createElement('canvas'),
+  rightRotation: document.createElement('canvas'),
 }
 function createArrows() {
   arrowCanvas.in.width = maxR*2, arrowCanvas.in.height = maxR*2
   arrowCanvas.out.width = maxR*2, arrowCanvas.out.height = maxR*2
   arrowCanvas.left.width = maxR*2, arrowCanvas.left.height = maxR*2
   arrowCanvas.right.width = maxR*2, arrowCanvas.right.height = maxR*2
+  arrowCanvas.leftRotation.width = maxR*2, arrowCanvas.leftRotation.height = maxR*2
+  arrowCanvas.rightRotation.width = maxR*2, arrowCanvas.rightRotation.height = maxR*2
   const ctx = {
     in: arrowCanvas.in.getContext('2d'),
     out: arrowCanvas.out.getContext('2d'),
@@ -196,6 +200,7 @@ function loadUsingSelect() {
   const strId = musicTable[id].AssetDirectory
   parseNotesFromFile(`MusicData/${strId}/${strId}_0${diffi}.mer`)
   fetch('Sound/Bgm/output/MER_BGM_'+strId.replace('-', '_')+'.m4a').then(r => r.blob()).then(b => {
+    if (/safari/i.test(navigator.userAgent) && !/chrome/i.test(navigator.userAgent)) b = new Blob([b], { type: 'audio/mp4' })
     setBgm(URL.createObjectURL(b))
   })
 }
@@ -824,6 +829,25 @@ function render(now) {
   })
 
   if (notesToRender.arrow.length) {
+    let arrowRotationSpeed = RENDER_DISTANCE * 4
+    if (notesToRender.flickL.length) {
+      let ctx = arrowCanvas.leftRotation.getContext('2d')
+      ctx.clearRect(0, 0, maxR*2, maxR*2)
+      ctx.translate(maxR, maxR)
+      ctx.rotate((currentDistance % arrowRotationSpeed) / arrowRotationSpeed * Math.PI)
+      ctx.translate(-maxR, -maxR)
+      ctx.drawImage(arrowCanvas.left, 0, 0)
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+    }
+    if (notesToRender.flickR.length) {
+      let ctx = arrowCanvas.rightRotation.getContext('2d')
+      ctx.clearRect(0, 0, maxR*2, maxR*2)
+      ctx.translate(maxR, maxR)
+      ctx.rotate(-(currentDistance % arrowRotationSpeed) / arrowRotationSpeed * Math.PI)
+      ctx.translate(-maxR, -maxR)
+      ctx.drawImage(arrowCanvas.right, 0, 0)
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+    }
     for (let i=notesToRender.arrow.length-1; i>=0; i--) {
       const a = notesToRender.arrow[i]
       const r = distanceToRenderRadius(maxR*0.95, (a.distance - currentDistance) / RENDER_DISTANCE)
@@ -848,11 +872,11 @@ function render(now) {
           break
         }
         case '5': case '6': case '23': {
-          ctx.drawImage(arrowCanvas.left, centerX-r, centerY-r, r*2, r*2)
+          ctx.drawImage(arrowCanvas.leftRotation, centerX-r, centerY-r, r*2, r*2)
           break
         }
         case '7': case '8': case '24': {
-          ctx.drawImage(arrowCanvas.right, centerX-r, centerY-r, r*2, r*2)
+          ctx.drawImage(arrowCanvas.rightRotation, centerX-r, centerY-r, r*2, r*2)
           break
         }
       }
