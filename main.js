@@ -169,8 +169,8 @@ fetch('Table/music_info.json').then(r=>r.json()).then(r => {
   console.error('failed loading music table', e)
 })
 const seContext = new AudioContext
-const bgmSrc = seContext.createMediaElementSource(bgm)
-bgmSrc.connect(seContext.destination)
+//const bgmSrc = seContext.createMediaElementSource(bgm)
+//bgmSrc.connect(seContext.destination)
 let seBuffer = null
 fetch('59.adx.wav').then(r => r.arrayBuffer()).then(r => {
   seContext.decodeAudioData(r, buf => {
@@ -593,7 +593,7 @@ function render(now) {
     currentTs = now - startTs
     let diffTs = currentTs - previousTs
     let calcBaseTs = currentTs
-    if (diffTs < 30) {
+    if (diffTs > 0 && diffTs < 30) {
       let guessedFps = Math.round((1000/diffTs)/12)*12
       calcBaseTs = Math.round(calcBaseTs / 1000 * guessedFps) / guessedFps * 1000
       drawCount.guessedFps = guessedFps
