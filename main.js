@@ -949,11 +949,13 @@ window.play = function () {
     }, 500)
   })
   seContext.resume()
+  gain.gain.value = se_volume.value / 100
 }
 window.pause = function () {
   bgm.pause()
   if (enableBga) bga.pause()
   playing = false
+  gain.gain.value = 0
 }
 window.stop = function () {
   pause()
