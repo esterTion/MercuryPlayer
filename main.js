@@ -56,23 +56,13 @@ let pendingSeRTrigger = []
 const arrowCanvas = {
   in: document.createElement('canvas'),
   out: document.createElement('canvas'),
-  left: document.createElement('canvas'),
-  right: document.createElement('canvas'),
-  leftRotation: document.createElement('canvas'),
-  rightRotation: document.createElement('canvas'),
 }
 function createArrows() {
   arrowCanvas.in.width = maxR*2, arrowCanvas.in.height = maxR*2
   arrowCanvas.out.width = maxR*2, arrowCanvas.out.height = maxR*2
-  arrowCanvas.left.width = maxR*2, arrowCanvas.left.height = maxR*2
-  arrowCanvas.right.width = maxR*2, arrowCanvas.right.height = maxR*2
-  arrowCanvas.leftRotation.width = maxR*2, arrowCanvas.leftRotation.height = maxR*2
-  arrowCanvas.rightRotation.width = maxR*2, arrowCanvas.rightRotation.height = maxR*2
   const ctx = {
     in: arrowCanvas.in.getContext('2d'),
     out: arrowCanvas.out.getContext('2d'),
-    left: arrowCanvas.left.getContext('2d'),
-    right: arrowCanvas.right.getContext('2d'),
   }
 
   const borderWidth = 12 * devicePixelRatio, colorWidth = 5 * devicePixelRatio
@@ -95,26 +85,6 @@ function createArrows() {
     ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
     ctx.out.strokeStyle = 'rgb(200,200,200)'; ctx.out.lineWidth = borderWidth; ctx.out.stroke()
     ctx.out.strokeStyle = 'rgb(33,180,251)'; ctx.out.lineWidth = colorWidth; ctx.out.stroke()
-  }
-
-  ctx.left.translate(maxR, maxR); ctx.left.rotate(Math.PI / 2); ctx.left.translate(-maxR, -maxR)
-  for (let i = 0; i < 30; i++) {
-    ctx.left.beginPath()
-    ctx.left.arc(maxR, maxR, maxR * 0.85, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
-    ctx.left.arc(maxR, maxR, maxR * 0.90, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
-    ctx.left.arc(maxR, maxR, maxR * 0.95, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
-    ctx.left.strokeStyle = 'rgb(200,200,200)'; ctx.left.lineWidth = borderWidth; ctx.left.stroke()
-    ctx.left.strokeStyle = 'rgb(246,159,55)'; ctx.left.lineWidth = colorWidth; ctx.left.stroke()
-  }
-
-  ctx.right.translate(maxR, maxR); ctx.right.rotate(Math.PI / 2); ctx.right.translate(-maxR, -maxR)
-  for (let i = 0; i < 30; i++) {
-    ctx.right.beginPath()
-    ctx.right.arc(maxR, maxR, maxR * 0.85, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
-    ctx.right.arc(maxR, maxR, maxR * 0.90, (i+0.3) * Math.PI / 15, (i+0.3) * Math.PI / 15)
-    ctx.right.arc(maxR, maxR, maxR * 0.95, (i+0.7) * Math.PI / 15, (i+0.7) * Math.PI / 15)
-    ctx.right.strokeStyle = 'rgb(200,200,200)'; ctx.right.lineWidth = borderWidth; ctx.right.stroke()
-    ctx.right.strokeStyle = 'rgb(98,251,43)'; ctx.right.lineWidth = colorWidth; ctx.right.stroke()
   }
 }
 
@@ -829,27 +799,19 @@ function render(now) {
   })
 
   if (notesToRender.arrow.length) {
-    let arrowRotationSpeed = RENDER_DISTANCE * 4
-    if (notesToRender.flickL.length) {
-      let ctx = arrowCanvas.leftRotation.getContext('2d')
-      ctx.clearRect(0, 0, maxR*2, maxR*2)
-      ctx.translate(maxR, maxR)
-      ctx.rotate((currentDistance % arrowRotationSpeed) / arrowRotationSpeed * Math.PI)
-      ctx.translate(-maxR, -maxR)
-      ctx.drawImage(arrowCanvas.left, 0, 0)
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-    }
-    if (notesToRender.flickR.length) {
-      let ctx = arrowCanvas.rightRotation.getContext('2d')
-      ctx.clearRect(0, 0, maxR*2, maxR*2)
-      ctx.translate(maxR, maxR)
-      ctx.rotate(-(currentDistance % arrowRotationSpeed) / arrowRotationSpeed * Math.PI)
-      ctx.translate(-maxR, -maxR)
-      ctx.drawImage(arrowCanvas.right, 0, 0)
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-    }
+    const flicks = [
+      [],
+      [],
+    ]
     for (let i=notesToRender.arrow.length-1; i>=0; i--) {
       const a = notesToRender.arrow[i]
+      if (['5','6','23'].indexOf(a.noteType) !== -1) {
+        flicks[0].push(a)
+        continue
+      } else if (['7','8','24'].indexOf(a.noteType) !== -1) {
+        flicks[1].push(a)
+        continue
+      }
       const r = distanceToRenderRadius(maxR*0.95, (a.distance - currentDistance) / RENDER_DISTANCE)
       const start = 60 - a.laneOffset - a.noteWidth, end = 60 - a.laneOffset
       ctx.save()
@@ -881,6 +843,83 @@ function render(now) {
         }
       }
       ctx.restore()
+    }
+    const arrowParam = [
+      [0.00, 0.05, 0.80, 0.90, 0.95, 1.00],
+      [0.30, 0.35, 1.00, 0.90, 0.50, 0.30],
+      [0.00, 0.50, 0.80, 0.30, 0.00, 0.00],
+    ]
+    const arrowTipParam = [
+      [0.00, 0.05, 0.90, 0.98, 1.00],
+      [0.30, 0.35, 1.00, 0.30, 0.00],
+      [0.00, 0.50, 0.90, 0.30, 0.00],
+    ]
+    const rotateSpeed = 8
+    for (let i=0; i<2; i++) {
+      const nodes = []
+      const arrowAngleDirection = [-0.4, 0.4][i]
+      const color = ['rgb(246,159,55)', 'rgb(98,251,43)'][i]
+      flicks[i].forEach(a => {
+        const r = distanceToRenderRadius(maxR*0.95, (a.distance - currentDistance) / RENDER_DISTANCE)
+        const start = 60 - a.laneOffset - a.noteWidth, end = 60 - a.laneOffset
+        const rPos = 1 - (a.distance - currentDistance) / RENDER_DISTANCE
+        const rotateOffset = ((rPos * rotateSpeed) * [1, -1][i] + 2) % 2
+        const flickNodes = {n:[], r:r}
+        for (let angle = start + rotateOffset; angle < end; angle+=2) {
+          const coordBase = [
+            angle + 0.2 + arrowAngleDirection,
+            angle + 0.2 - arrowAngleDirection,
+            angle + 0.2 + arrowAngleDirection,
+          ]
+          const subNodes = {n:[], w:0}
+          for (let j=0; j<3; j++) {
+            const useParam = [arrowParam, arrowTipParam, arrowParam][j]
+            let pos = (coordBase[j] - start) / (end - start)
+            if (i) pos = 1 - pos
+            let h = useParam[1][0], w = useParam[2][0]
+            for (let k=0; k<useParam[0].length; k++) {
+              if (k === useParam[0].length - 1) {
+                h = useParam[1][k]
+                w = useParam[2][k]
+                break
+              }
+              if (pos >= useParam[0][k] && pos < useParam[0][k + 1]) {
+                h = useParam[1][k] + (useParam[1][k+1] - useParam[1][k]) * ((pos - useParam[0][k]) / (useParam[0][k+1] - useParam[0][k]))
+                w = useParam[2][k] + (useParam[2][k+1] - useParam[2][k]) * ((pos - useParam[0][k]) / (useParam[0][k+1] - useParam[0][k]))
+                break
+              }
+            }
+            w *= 0.8 * rPos
+            subNodes.n.unshift([h * [-1, 0, 1][j], (coordBase[j] - w) * Math.PI / 30])
+            subNodes.n.push   ([h * [-1, 0, 1][j], (coordBase[j] + w) * Math.PI / 30])
+            if (j == 1) subNodes.w = w
+          }
+          flickNodes.n.push(subNodes)
+        }
+        nodes.push(flickNodes)
+      })
+      ctx.strokeStyle = 'rgb(200,200,200)'
+      ctx.fillStyle = color
+      nodes.forEach(i => {
+        //ctx.clearRect(0, 0, canvas.width, canvas.height)
+        const scale = i.r / maxR
+        i.n.forEach(i => {
+          ctx.lineWidth = i.w / 0.8 * 4 * devicePixelRatio
+          ctx.translate(centerX, centerY)
+          ctx.scale(scale, scale)
+          ctx.beginPath()
+          i.n.forEach(i => {
+            ctx.arc(0, 0, maxR * (0.9 + 0.075 * i[0]), i[1], i[1])
+          })
+          ctx.closePath()
+          ctx.fill()
+          if (i.w > 0) ctx.stroke()
+          ctx.setTransform(1, 0, 0, 1, 0, 0)
+        })
+
+        //const r = i.r
+        //ctx.drawImage(arrowCanvas.flick, 0, 0)
+      })
     }
   }
 
