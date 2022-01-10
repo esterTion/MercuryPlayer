@@ -488,7 +488,6 @@ function parseNotesFromText(text) {noteList = [];
 const drawCount = {
   frame: 0,
   actualFrame: 0,
-  guessedFps: 0,
 }
 let currentSectionDiv = stats.parentNode.insertBefore(document.createElement('div'), stats)
 toggle_ui.addEventListener('input', () => {
@@ -501,7 +500,6 @@ setInterval(() => {
   stats.textContent = [
     `frame draw: ${drawCount.frame}`,
     `frame actual draw: ${drawCount.actualFrame}`,
-    `guess fps: ${drawCount.guessedFps}`,
   ].join('\n')
   drawCount.frame = 0
   drawCount.actualFrame = 0
@@ -591,13 +589,7 @@ function render(now) {
       sfl = sflTsList[sflOffset].sfl
     }
     currentTs = now - startTs
-    let diffTs = currentTs - previousTs
     let calcBaseTs = currentTs
-    if (diffTs > 0 && diffTs < 30) {
-      let guessedFps = Math.round((1000/diffTs)/12)*12
-      calcBaseTs = Math.round(calcBaseTs / 1000 * guessedFps) / guessedFps * 1000
-      drawCount.guessedFps = guessedFps
-    }
     for (let i=0; i<reverseSection.length; i++) {
       if (calcBaseTs > reverseSection[i][0] && calcBaseTs < reverseSection[i][1]) {
         calcBaseTs = reverseSection[i][1] + (reverseSection[i][1] - calcBaseTs) * (reverseSection[i][2] - reverseSection[i][1]) / (reverseSection[i][1] - reverseSection[i][0])
