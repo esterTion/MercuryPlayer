@@ -70,9 +70,9 @@ function createArrows() {
   ctx.in.translate(maxR, maxR); ctx.in.rotate(Math.PI / 2); ctx.in.translate(-maxR, -maxR)
   for (let i = 0; i < 30; i++) {
     ctx.in.beginPath()
-    ctx.in.arc(maxR, maxR, maxR * 0.95, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
-    ctx.in.arc(maxR, maxR, maxR * 0.85, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
-    ctx.in.arc(maxR, maxR, maxR * 0.95, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
+    ctx.in.arc(maxR, maxR, maxR * 0.9, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
+    ctx.in.arc(maxR, maxR, maxR * 0.8, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
+    ctx.in.arc(maxR, maxR, maxR * 0.9, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
     ctx.in.strokeStyle = 'rgb(200,200,200)'; ctx.in.lineWidth = borderWidth; ctx.in.stroke()
     ctx.in.strokeStyle = 'rgb(203,29,25)'; ctx.in.lineWidth = colorWidth; ctx.in.stroke()
   }
@@ -80,9 +80,9 @@ function createArrows() {
   ctx.out.translate(maxR, maxR); ctx.out.rotate(Math.PI / 2); ctx.out.translate(-maxR, -maxR)
   for (let i = 0; i < 30; i++) {
     ctx.out.beginPath()
-    ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
-    ctx.out.arc(maxR, maxR, maxR * 0.95, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
-    ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
+    ctx.out.arc(maxR, maxR, maxR * 0.75, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
+    ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
+    ctx.out.arc(maxR, maxR, maxR * 0.75, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
     ctx.out.strokeStyle = 'rgb(200,200,200)'; ctx.out.lineWidth = borderWidth; ctx.out.stroke()
     ctx.out.strokeStyle = 'rgb(33,180,251)'; ctx.out.lineWidth = colorWidth; ctx.out.stroke()
   }
@@ -647,14 +647,18 @@ function render(now) {
     ctx.strokeStyle = '#BBB'
     notesToRender.sectionSep.forEach(i => {
       const r = distanceToRenderRadius(maxR, (i.distance - currentDistance) / RENDER_DISTANCE)
-      ctx.lineWidth = (r * 6 / maxR + 0.5) * thicc
+      ctx.lineWidth = 10 * thicc
+      const scale = r / maxR
+      ctx.translate(centerX, centerY)
+      ctx.scale(scale, scale)
       ctx.beginPath()
       ctx.arc(
-        centerX, centerY,
-        r,
+        0, 0,
+        maxR,
         0, Math.PI * 2
       )
       ctx.stroke()
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
     })
   }
   {
@@ -733,15 +737,19 @@ function render(now) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
         const r = distanceToRenderRadius(maxR, (i.distance - currentDistance) / RENDER_DISTANCE)
-        ctx.lineWidth = (r * 6 / maxR + 0.5) * thicc
+        ctx.lineWidth = 10 * thicc
         const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
+        const scale = r / maxR
+        ctx.translate(centerX, centerY)
+        ctx.scale(scale, scale)
         ctx.beginPath()
         ctx.arc(
-          centerX, centerY,
-          r,
+          0, 0,
+          maxR,
           Math.PI * (start / 30), Math.PI * (end / 30)
         )
         ctx.stroke()
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
       })
     }
   }
@@ -754,16 +762,20 @@ function render(now) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
         const r = distanceToRenderRadius(maxR, (i.distance - currentDistance) / RENDER_DISTANCE)
-        ctx.lineWidth = (r * 6 / maxR + 0.5) * thicc
+        ctx.lineWidth = 10 * thicc
         const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
         const cutOut = i.noteWidth < 60 ? 0.01 : 0
+        const scale = r / maxR
+        ctx.translate(centerX, centerY)
+        ctx.scale(scale, scale)
         ctx.beginPath()
         ctx.arc(
-          centerX, centerY,
-          r,
+          0, 0,
+          maxR,
           Math.PI * (start / 30) + cutOut, Math.PI * (end / 30) - cutOut
         )
         ctx.stroke()
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
       })
     }
   }
@@ -779,21 +791,25 @@ function render(now) {
   ]
   colorMap.forEach(noteType => {
     const key = noteType[0], color = noteType[1]
-    const thicc = (['flickL','flickR','snapIn','snapOut'].indexOf(key) === -1 ? 2.25 : 3) * devicePixelRatio
+    const thicc = (['flickL','flickR','snapIn','snapOut'].indexOf(key) === -1 ? 2.25 : 2.5) * devicePixelRatio
     if (notesToRender[key].length) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
         const r = distanceToRenderRadius(maxR, (i.distance - currentDistance) / RENDER_DISTANCE)
-        ctx.lineWidth = (r * 6 / maxR + 0.5) * thicc
+        ctx.lineWidth = 10 * thicc
         const start = 60 - i.laneOffset - i.noteWidth, end = 60 - i.laneOffset
         const cutOut = i.noteWidth < 60 ? 0.03 : 0
+        const scale = r / maxR
+        ctx.translate(centerX, centerY)
+        ctx.scale(scale, scale)
         ctx.beginPath()
         ctx.arc(
-          centerX, centerY,
-          r,
+          0, 0,
+          maxR,
           Math.PI * (start / 30) + cutOut, Math.PI * (end / 30) - cutOut
         )
         ctx.stroke()
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
       })
     }
   })
@@ -812,7 +828,7 @@ function render(now) {
         flicks[1].push(a)
         continue
       }
-      const r = distanceToRenderRadius(maxR*0.95, (a.distance - currentDistance) / RENDER_DISTANCE)
+      const r = distanceToRenderRadius(maxR, (a.distance - currentDistance) / RENDER_DISTANCE)
       const start = 60 - a.laneOffset - a.noteWidth, end = 60 - a.laneOffset
       ctx.save()
       ctx.beginPath()
@@ -855,8 +871,8 @@ function render(now) {
       [0.00, 0.50, 0.90, 0.30, 0.00],
     ]
     const rotateSpeed = 8
+    const nodes = []
     for (let i=0; i<2; i++) {
-      const nodes = []
       const arrowAngleDirection = [-0.4, 0.4][i]
       const color = ['rgb(246,159,55)', 'rgb(98,251,43)'][i]
       flicks[i].forEach(a => {
@@ -864,12 +880,13 @@ function render(now) {
         const start = 60 - a.laneOffset - a.noteWidth, end = 60 - a.laneOffset
         const rPos = 1 - (a.distance - currentDistance) / RENDER_DISTANCE
         const rotateOffset = ((rPos * rotateSpeed) * [1, -1][i] + 2) % 2
-        const flickNodes = {n:[], r:r}
+        const flickNodes = {n:[], r:r, c: color}
         for (let angle = start + rotateOffset; angle < end; angle+=2) {
+          const sharpness = (angle - start) / (end - start) + 0.5
           const coordBase = [
-            angle + 0.2 + arrowAngleDirection,
-            angle + 0.2 - arrowAngleDirection,
-            angle + 0.2 + arrowAngleDirection,
+            angle + 0.2 + arrowAngleDirection * (i ? 2 - sharpness : sharpness),
+            angle + 0.2 - arrowAngleDirection * (i ? 2 - sharpness : sharpness),
+            angle + 0.2 + arrowAngleDirection * (i ? 2 - sharpness : sharpness),
           ]
           const subNodes = {n:[], w:0}
           for (let j=0; j<3; j++) {
@@ -898,29 +915,30 @@ function render(now) {
         }
         nodes.push(flickNodes)
       })
-      ctx.strokeStyle = 'rgb(200,200,200)'
-      ctx.fillStyle = color
-      nodes.forEach(i => {
-        //ctx.clearRect(0, 0, canvas.width, canvas.height)
-        const scale = i.r / maxR
-        i.n.forEach(i => {
-          ctx.lineWidth = i.w / 0.8 * 4 * devicePixelRatio
-          ctx.translate(centerX, centerY)
-          ctx.scale(scale, scale)
-          ctx.beginPath()
-          i.n.forEach(i => {
-            ctx.arc(0, 0, maxR * (0.9 + 0.075 * i[0]), i[1], i[1])
-          })
-          ctx.closePath()
-          ctx.fill()
-          if (i.w > 0) ctx.stroke()
-          ctx.setTransform(1, 0, 0, 1, 0, 0)
-        })
-
-        //const r = i.r
-        //ctx.drawImage(arrowCanvas.flick, 0, 0)
-      })
     }
+    ctx.strokeStyle = 'rgb(200,200,200)'
+    nodes.sort((a,b) => a.r - b.r)
+    nodes.forEach(i => {
+      //ctx.clearRect(0, 0, canvas.width, canvas.height)
+      const scale = i.r / maxR
+      ctx.fillStyle = i.c
+      i.n.forEach(i => {
+        ctx.lineWidth = i.w / 0.8 * 4 * devicePixelRatio
+        ctx.translate(centerX, centerY)
+        ctx.scale(scale, scale)
+        ctx.beginPath()
+        i.n.forEach(i => {
+          ctx.arc(0, 0, maxR * (0.875 + 0.075 * i[0]), i[1], i[1])
+        })
+        ctx.closePath()
+        ctx.fill()
+        if (i.w > 0) ctx.stroke()
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+      })
+
+      //const r = i.r
+      //ctx.drawImage(arrowCanvas.flick, 0, 0)
+    })
   }
 
   {
@@ -1114,7 +1132,8 @@ function updateLaneOnState(fromTs, toTs) {
     }
     laneChangeIdx++
   }
-  pendingLaneChange.forEach(i => {
+  for (let i_ = 0; i_<pendingLaneChange.length; i_++) {
+    const i = pendingLaneChange[i_]
     const value = i.noteType === '12' ? 1 : 0
     const transitionPercent = Math.min(toTs - i.timestamp, transitionLength) / transitionLength
     const width = i.noteWidth * laneEffectMul
@@ -1122,8 +1141,9 @@ function updateLaneOnState(fromTs, toTs) {
       for (let idx = 0; idx < width; idx++) {
         laneOnState[(i.laneOffset * laneEffectMul + idx) % (60 * laneEffectMul)] = value
       }
-      pendingLaneChange.splice(pendingLaneChange.indexOf(i), 1)
-      return
+      pendingLaneChange.splice(i_, 1)
+      i_--
+      continue
     }
     for (let idx = 0; idx < width; idx++) {
       let idxCompare = idx + 0.5
@@ -1141,7 +1161,7 @@ function updateLaneOnState(fromTs, toTs) {
       }
       laneOnState[(i.laneOffset * laneEffectMul + idx) % (60 * laneEffectMul)] = value
     }
-  })
+  }
 }
 
 bgm.addEventListener('seeked', function (e) {
