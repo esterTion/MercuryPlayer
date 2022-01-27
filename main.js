@@ -65,7 +65,7 @@ function createArrows() {
     out: arrowCanvas.out.getContext('2d'),
   }
 
-  const borderWidth = 12 * devicePixelRatio, colorWidth = 5 * devicePixelRatio
+  const borderWidth = 12 * displayRatio, colorWidth = 5 * displayRatio
 
   ctx.in.translate(maxR, maxR); ctx.in.rotate(Math.PI / 2); ctx.in.translate(-maxR, -maxR)
   for (let i = 0; i < 30; i++) {
@@ -269,6 +269,7 @@ function parseNotesFromText(text) {noteList = [];
         value1: parseFloat(line[3]),
         value2: line[4] != undefined ? parseFloat(line[4]) : null,
       }
+      if (isNaN(control.section) || isNaN(control.tick)) return
       const controlId = line[0]+'_'+line[1]+'_'+line[2]
       control.tickTotal = tickFromSectionAndTick(control.section, control.tick);
       if (controlDupFix[controlId]) {
@@ -487,6 +488,7 @@ let drawForNextFrame = false
 let NOTE_APPEAR_DISTANCE = 1
 let NOTE_SPEED_POWER = 1.95
 let chartLength = 0
+let displayRatio = 1
 const laneEffectMul = 1
 const laneOnState = new Uint8Array(60 * laneEffectMul)
 function render(now) {
@@ -524,7 +526,7 @@ function render(now) {
   laneGradient.addColorStop(0.1, 'rgba(128,128,128,0)');
   laneGradient.addColorStop(0.2, 'rgba(128,128,128,0.3)');
   laneGradient.addColorStop(1, 'rgba(128,128,128,0.8)');
-  ctx.lineWidth = 1 * devicePixelRatio
+  ctx.lineWidth = 1 * displayRatio
   ctx.strokeStyle = laneGradient
   ctx.beginPath();
   for (let i=0; i<30; i++) {
@@ -643,7 +645,7 @@ function render(now) {
   })
 
   if (notesToRender.sectionSep.length) {
-    const thicc = 0.5 * devicePixelRatio
+    const thicc = 0.5 * displayRatio
     ctx.strokeStyle = '#BBB'
     notesToRender.sectionSep.forEach(i => {
       const r = distanceToRenderRadius(maxR, (i.distance - currentDistance) / RENDER_DISTANCE)
@@ -732,7 +734,7 @@ function render(now) {
   // blue extend for same time notes
   {
     const key = 'sameTime', color = 'rgb(80,255,250)'
-    const thicc = 4 * devicePixelRatio
+    const thicc = 4 * displayRatio
     if (notesToRender[key].length) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
@@ -757,7 +759,7 @@ function render(now) {
   // white border for R notes
   {
     const key = 'R', color = 'rgb(255,255,255)'
-    const thicc = 5 * devicePixelRatio
+    const thicc = 5 * displayRatio
     if (notesToRender[key].length) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
@@ -791,7 +793,7 @@ function render(now) {
   ]
   colorMap.forEach(noteType => {
     const key = noteType[0], color = noteType[1]
-    const thicc = (['flickL','flickR','snapIn','snapOut'].indexOf(key) === -1 ? 2.25 : 2.5) * devicePixelRatio
+    const thicc = (['flickL','flickR','snapIn','snapOut'].indexOf(key) === -1 ? 2.25 : 2.5) * displayRatio
     if (notesToRender[key].length) {
       ctx.strokeStyle = color
       notesToRender[key].forEach(i => {
@@ -923,7 +925,7 @@ function render(now) {
       const scale = i.r / maxR
       ctx.fillStyle = i.c
       i.n.forEach(i => {
-        ctx.lineWidth = i.w / 0.8 * 4 * devicePixelRatio
+        ctx.lineWidth = i.w / 0.8 * 4 * displayRatio
         ctx.translate(centerX, centerY)
         ctx.scale(scale, scale)
         ctx.beginPath()
@@ -948,7 +950,7 @@ function render(now) {
     }
     ctx.strokeStyle = 'rgba(0,0,0,0.3)'
     const r = maxR * 0.98
-    ctx.lineWidth = (r * 5 / maxR + 2) * devicePixelRatio
+    ctx.lineWidth = (r * 5 / maxR + 2) * displayRatio
     ctx.beginPath()
     ctx.arc(
       centerX, centerY,
@@ -1178,11 +1180,12 @@ speed_input.addEventListener('change', e => {
   drawForNextFrame = true
 })
 function resize() {
-  const w = Math.round(window.innerWidth * devicePixelRatio), h = Math.round(window.innerHeight * devicePixelRatio)
+  const w = Math.round(window.innerWidth * displayRatio), h = Math.round(window.innerHeight * displayRatio)
   canvas.width = w
   canvas.height = h
   maxR = Math.round(Math.min(w, h) * 0.45)
   drawForNextFrame = true
+  displayRatio = Math.max(w, h) / 1920
 
   if (enableBga) {
     const wView = window.innerWidth, hView = window.innerHeight
