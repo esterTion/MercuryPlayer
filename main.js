@@ -169,17 +169,14 @@ function loadUsingSelect() {
   stop()
   const strId = musicTable[id].AssetDirectory
   parseNotesFromFile(`MusicData/${strId}/${strId}_0${diffi}.mer`)
-  fetch('Sound/Bgm/output/MER_BGM_'+strId.replace('-', '_')+'.m4a').then(r => r.blob()).then(b => {
-    if (/safari/i.test(navigator.userAgent) && !/chrome/i.test(navigator.userAgent)) b = new Blob([b], { type: 'audio/mp4' })
-    setBgm(URL.createObjectURL(b))
-  })
+  setBgm('Sound/Bgm/output/MER_BGM_'+strId.replace('-', '_')+'.m4a')
 }
 function loadUsingFile() {
   if (music_file.files.length && bgm_file.files.length) {
     const reader = new FileReader()
     reader.readAsText(music_file.files[0], 'UTF-8')
     reader.onload = e => parseNotesFromText(reader.result)
-    bgm.src = URL.createObjectURL(bgm_file.files[0])
+    setBgm(URL.createObjectURL(bgm_file.files[0]))
   } else {
     alert('choose file')
   }
@@ -200,8 +197,22 @@ music_select.addEventListener('change', e => {
   }
 })
 
+let bgmBuffer = null
 function setBgm(path) {
-  bgm.src = path
+  bgmBuffer = null
+  fetch(path).then(r => r.arrayBuffer()).then(b => {
+    setBgmFromBuffer(b)
+  })
+}
+function setBgmFromBuffer(r) {
+  seContext.decodeAudioData(r, buf => {
+    if (buf) {
+      bgmBuffer = buf
+      bgmCtr.duration = bgmBuffer.duration
+    } else {
+      console.error('decode failed')
+    }
+  }, e => console.error(e))
 }
 function parseNotesFromFile(file) {
   fetch(file).then(r=>r.text()).then(parseNotesFromText)
@@ -454,6 +465,10 @@ function parseNotesFromText(text) {noteList = [];
 
   seRTrigger = Object.keys(noteListForPlayback.filter(i=>['20','21','22','23','24','25','26'].indexOf(i.noteType) !== -1).map(i => i.timestamp).reduce((v,i) => (v[Math.round(i)]=1,v), {})).map(i => parseInt(i)).sort((a,b)=>(a-b))
   seTrigger = Object.keys(noteListForPlayback.filter(i=>['10','12','13','14','sectionSep'].indexOf(i.noteType) === -1).map(i => i.timestamp).reduce((v,i) => (v[Math.round(i)]=1,v), {})).map(i => parseInt(i)).sort((a,b)=>(a-b))
+
+  if (chartHeader.MUSIC_FILE_PATH) {
+    setBgm('Sound/Bgm/output/'+chartHeader.MUSIC_FILE_PATH+'.m4a')
+  }
 }
 
 const drawCount = {
@@ -561,7 +576,7 @@ function render(now) {
       sfl = sflTsList[sflOffset].sfl
     }
     currentTs = now - startTs
-    let calcBaseTs = currentTs
+    let calcBaseTs = Math.max(currentTs, 0)
     for (let i=0; i<reverseSection.length; i++) {
       if (calcBaseTs > reverseSection[i][0] && calcBaseTs < reverseSection[i][1]) {
         calcBaseTs = reverseSection[i][1] + (reverseSection[i][1] - calcBaseTs) * (reverseSection[i][2] - reverseSection[i][1]) / (reverseSection[i][1] - reverseSection[i][0])
@@ -573,7 +588,7 @@ function render(now) {
   }
 
   if (noteListForPlayback.length) {
-    currentSection = noteListForPlayback.filter(i => i.noteType === 'sectionSep' && i.timestamp <= currentTs).pop().section
+    currentSection = (noteListForPlayback.filter(i => i.noteType === 'sectionSep' && i.timestamp <= currentTs).pop()||{section:0}).section
   }
   currentSectionDiv.textContent = `current section: ${currentSection}`
 
@@ -983,6 +998,8 @@ function render(now) {
     }
   }
 }
+let globalPlaybackOffset = 0
+if (/win32/i.test(navigator.platform) && /firefox/i.test(navigator.userAgent)) globalPlaybackOffset = -60
 let CALC_CONE_HEIGHT = 6
 let CALC_CONE_RADIUS = 2
 function distanceToRenderRadius (maxR, distance) {
@@ -991,27 +1008,31 @@ function distanceToRenderRadius (maxR, distance) {
   let angle = Math.atan(h / a) * 2 / Math.PI
   return maxR * (1 - angle) * 2
 }
+let bgmBufSrc = null
 window.play = function () {
   startNextFrame = true
-  bgm.play()
+  if (bgmBuffer != null && bgmBufSrc == null) {
+    bgmBufSrc = seContext.createBufferSource()
+    bgmBufSrc.buffer = bgmBuffer
+    bgmBufSrc.connect(bgmGain)
+    bgmBufSrc.start(0, bgmCtr.currentTime)
+    currentTs = Math.round(bgmCtr.currentTime * 1000) + globalPlaybackOffset
+  }
+  bgmCtr.play()
   if (enableBga) bga.play()
   bga.muted = true
-  currentTs = Math.round(bgm.currentTime * 1000)
   playing = true
   pendingSeTrigger = seTrigger.filter(i => i > currentTs)
   pendingSeRTrigger = seRTrigger.filter(i => i > currentTs)
-  bgm.addEventListener('timeupdate', function temp(e) {
-    bgm.removeEventListener('timeupdate', temp)
-    setTimeout(() => {
-      startNextFrame = true
-      currentTs = Math.round(bgm.currentTime * 1000)
-    }, 500)
-  })
   seContext.resume()
   gain.gain.value = se_volume.value / 100
 }
 window.pause = function () {
-  bgm.pause()
+  if (bgmBufSrc != null) {
+    bgmBufSrc.stop()
+    bgmBufSrc = null
+  }
+  bgmCtr.pause()
   if (enableBga) bga.pause()
   playing = false
   gain.gain.value = 0
@@ -1020,7 +1041,7 @@ window.stop = function () {
   pause()
   currentDistance = 0
   currentTs = 0
-  bgm.currentTime = 0
+  bgmCtr.currentTime = 0
   if (enableBga) bga.currentTime = 0
   drawForNextFrame = true
   sflOffset = 0
@@ -1028,7 +1049,7 @@ window.stop = function () {
 }
 window.setPlaybackTime = function (time = 0) {
   currentTs = Math.round(time * 1000)
-  bgm.currentTime = time
+  bgmCtr.currentTime = time
 }
 requestAnimationFrame(render)
 function getNotesForDraw(currentDistance, renderDistance = RENDER_DISTANCE) {
@@ -1109,7 +1130,7 @@ function getHoldsForDraw(currentDistance, currentTs, renderDistance = RENDER_DIS
 }
 
 const pendingLaneChange = []
-const transitionLength = 80
+//const transitionLength = 80
 let laneChangeIdx = 0
 function updateLaneOnState(fromTs, toTs) {
   if (!laneToggleList.length) return
@@ -1123,6 +1144,7 @@ function updateLaneOnState(fromTs, toTs) {
   while (laneChangeIdx < laneToggleList.length) {
     let i = laneToggleList[laneChangeIdx]
     if (i.timestamp > toTs) break
+    const transitionLength = i.noteWidth * 1000 / 60 / 2
     if (i.tickTotal === 0 || toTs - i.timestamp > transitionLength) {
       const value = i.noteType === '12' ? 1 : 0
       const width = i.noteWidth * laneEffectMul
@@ -1137,6 +1159,7 @@ function updateLaneOnState(fromTs, toTs) {
   for (let i_ = 0; i_<pendingLaneChange.length; i_++) {
     const i = pendingLaneChange[i_]
     const value = i.noteType === '12' ? 1 : 0
+    const transitionLength = i.noteWidth * 1000 / 60 / 2
     const transitionPercent = Math.min(toTs - i.timestamp, transitionLength) / transitionLength
     const width = i.noteWidth * laneEffectMul
     if (toTs - i.timestamp > transitionLength) {
@@ -1166,14 +1189,7 @@ function updateLaneOnState(fromTs, toTs) {
   }
 }
 
-bgm.addEventListener('seeked', function (e) {
-  currentTs = Math.round(this.currentTime * 1000)
-  if (enableBga) bga.currentTime = this.currentTime
-  startNextFrame = true
-})
-bgm.addEventListener('pause', pause)
-bgm.addEventListener('play', play)
-speed_input.addEventListener('change', e => {
+speed_input.addEventListener('input', e => {
   const speed = speed_input.value / 10
   speed_val.textContent = speed
   RENDER_DISTANCE = 3000 / speed
@@ -1207,6 +1223,8 @@ resize();
 
 let gain = seContext.createGain()
 gain.connect(seContext.destination);
+let bgmGain = seContext.createGain()
+bgmGain.connect(seContext.destination)
 for (let i=0; i<11; i++) {
   let option = document.createElement('option')
   option.setAttribute('value', i * 10)
@@ -1231,5 +1249,232 @@ se_file.addEventListener('change', () => {
   }
 })
 
+class BgmController {
+  __playSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" fill=\"context-fill\" fill-opacity=\"context-fill-opacity\"><path d=\"m2.992 13.498 0-10.996a1.5 1.5 0 0 1 2.245-1.303l9.621 5.498a1.5 1.5 0 0 1 0 2.605L5.237 14.8a1.5 1.5 0 0 1-2.245-1.302z\"/></svg>"
+  __pauseSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" fill=\"context-fill\" fill-opacity=\"context-fill-opacity\"><path d=\"m4.5 14-1 0A1.5 1.5 0 0 1 2 12.5l0-9A1.5 1.5 0 0 1 3.5 2l1 0A1.5 1.5 0 0 1 6 3.5l0 9A1.5 1.5 0 0 1 4.5 14z\"/><path d=\"m11.5 14-1 0A1.5 1.5 0 0 1 9 12.5l0-9A1.5 1.5 0 0 1 10.5 2l1 0A1.5 1.5 0 0 1 13 3.5l0 9a1.5 1.5 0 0 1-1.5 1.5z\"/></svg>"
+  __volumeSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" fill=\"context-fill\" fill-opacity=\"context-fill-opacity\"><path d=\"M7.245 1.35 4.117 5 2 5a2 2 0 0 0-2 2l0 2a2 2 0 0 0 2 2l2.117 0 3.128 3.65C7.848 15.353 9 14.927 9 14L9 2c0-.927-1.152-1.353-1.755-.65z\"/><path d=\"M11.764 15a.623.623 0 0 1-.32-1.162 6.783 6.783 0 0 0 3.306-5.805 6.767 6.767 0 0 0-3.409-5.864.624.624 0 1 1 .619-1.085A8.015 8.015 0 0 1 16 8.033a8.038 8.038 0 0 1-3.918 6.879c-.1.06-.21.088-.318.088z\"/><path d=\"M11.434 11.85A4.982 4.982 0 0 0 13.25 8a4.982 4.982 0 0 0-1.819-3.852l-.431 0 0 7.702.434 0z\"/></svg>"
+  __volumeMutedSvg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" fill=\"context-fill\" fill-opacity=\"context-fill-opacity\"><path d=\"m11 4.149 0 4.181 1.775 1.775c.3-.641.475-1.35.475-2.105a4.981 4.981 0 0 0-1.818-3.851l-.432 0z\"/><path d=\"M2.067 1.183a.626.626 0 0 0-.885.885L4.115 5 2 5a2 2 0 0 0-2 2l0 2a2 2 0 0 0 2 2l2.117 0 3.128 3.65C7.848 15.353 9 14.927 9 14l0-4.116 3.317 3.317c-.273.232-.56.45-.873.636a.624.624 0 0 0-.218.856.621.621 0 0 0 .856.219 7.58 7.58 0 0 0 1.122-.823l.729.729a.626.626 0 0 0 .884-.886L2.067 1.183z\"/><path d=\"M9 2c0-.926-1.152-1.352-1.755-.649L5.757 3.087 9 6.33 9 2z\"/><path d=\"M11.341 2.169a6.767 6.767 0 0 1 3.409 5.864 6.732 6.732 0 0 1-.83 3.217l.912.912A7.992 7.992 0 0 0 16 8.033a8.018 8.018 0 0 0-4.04-6.95.625.625 0 0 0-.619 1.086z\"/></svg>"
+
+  _element = null
+  _playBtn = null
+  _progressInput = null
+  _playedText = null
+  _durationText = null
+  _volumeBtn = null
+  _volumeInput = null
+  _currentTime = 0
+  _duration = 0
+  _playing = false
+  _volume = 1
+  _muted = false
+  _pendingSeek = false
+
+  /**
+   * @param {HTMLElement} e
+   */
+  constructor(e) {
+    this._element = e
+    // while (e.childNodes.length) e.childNodes[0].remove()
+    e.innerHTML = '<div class="btn"></div><div class="progress"><input type="range" step="any" min="0" max="1" value="0"/></div><div class="duration"><span class="played">0:00</span><span class="duration-grey"> / <span class="total">0:00</span></span></div><div class="volume"></div><div class="volume_slider"><input type="range" step="any" min="0" max="1" value="1"/></div>'
+    this._playBtn = e.getElementsByClassName('btn')[0]
+    this._progressInput = e.getElementsByClassName('progress')[0].children[0]
+    this._playedText = e.getElementsByClassName('played')[0]
+    this._durationText = e.getElementsByClassName('total')[0]
+    this._volumeBtn = e.getElementsByClassName('volume')[0]
+    this._volumeInput = e.getElementsByClassName('volume_slider')[0].children[0]
+
+    this.setPlayBtn(false)
+    this.setVolumeBtn(false)
+
+    this.setListeners()
+  }
+
+  setPlayBtn(isPause) {
+    if (isPause) {
+      this._playBtn.innerHTML = this.__pauseSvg
+    } else {
+      this._playBtn.innerHTML = this.__playSvg
+    }
+  }
+  setVolumeBtn(isMute) {
+    if (isMute) {
+      this._volumeBtn.innerHTML = this.__volumeMutedSvg
+    } else {
+      this._volumeBtn.innerHTML = this.__volumeSvg
+    }
+  }
+
+  play() {
+    if (this._playing) return
+    if (this._currentTime >= this._duration) {
+      this._currentTime = 0
+    }
+    this._playing = true
+    this.setPlayBtn(this._playing)
+    this.dispatchEvent('play')
+  }
+  pause() {
+    if (!this._playing) return
+    this._playing = false
+    this.setPlayBtn(this._playing)
+    this.dispatchEvent('pause')
+  }
+  get volume() {
+    if (this._muted) return 0
+    return this._volume
+  }
+  /**
+   * @param {number} v
+   */
+  set volume(v) {
+    if (typeof v !== 'number' || isNaN(v)) return
+    v = Math.max(0, v)
+    v = Math.min(1, v)
+    this.dispatchEvent('volumeChange', v)
+    this._volumeInput.value = v
+    if (v === 0) {
+      this._muted = true
+      this.setVolumeBtn(this._muted)
+    } else {
+      this._muted = false
+      this._volume = v
+      this.setVolumeBtn(this._muted)
+      this.dispatchEvent('volumeChange', this._volume)
+    }
+  }
+  get duration() {
+    return this._duration
+  }
+  set duration(v) {
+    this._duration = Math.max(v, 0)
+    this.updateTotalTime(this._duration)
+  }
+  get currentTime() {
+    return this._currentTime
+  }
+  set currentTime(v) {
+    this._currentTime = Math.min(v, this._duration)
+    this.updateCurrentTime(this._currentTime)
+  }
+
+  _lastNow = null
+  timerFunc(now) {
+    const elapsed = now - this._lastNow
+    this._lastNow = now
+    requestAnimationFrame(this._timerFuncBound)
+    if (!this._playing) return
+    if (this._duration <= 0) return
+    this._currentTime += elapsed / 1000
+    if (this._currentTime >= this._duration) {
+      this._currentTime = this._duration
+      this.pause()
+    }
+    if (!this._pendingSeek) {
+      this.updateCurrentTime(this._currentTime)
+    }
+  }
+  _timerFuncBound = null
+
+  setListeners() {
+    this._playBtn.addEventListener('click', this.playBtnClick.bind(this))
+    this._volumeBtn.addEventListener('click', this.volumeBtnClick.bind(this))
+    this._progressInput.addEventListener('input', this.progressInput.bind(this))
+    this._progressInput.addEventListener('change', this.progressChange.bind(this))
+    this._volumeInput.addEventListener('input', this.volumeInput.bind(this))
+    this._volumeInput.addEventListener('change', this.volumeChange.bind(this))
+
+    this._timerFuncBound = this.timerFunc.bind(this)
+    this._lastNow = performance.now()
+    requestAnimationFrame(this._timerFuncBound)
+  }
+  playBtnClick(e) {
+    if (this._playing) { // pause
+      this.pause()
+    } else { // play
+      this.play()
+    }
+  }
+  volumeBtnClick(e) {
+    if (this._muted) { // unmute
+      this.volume = this._volume
+    } else { // mute
+      this.volume = 0
+    }
+  }
+  progressInput(e) {
+    if (this._duration <= 0) {
+      e.target.value = 0
+      return
+    }
+    this._pendingSeek = true
+    this.updateCurrentTime(e.target.value * this._duration)
+  }
+  progressChange(e) {
+    if (this._duration <= 0) {
+      e.target.value = 0
+      return
+    }
+    this._pendingSeek = false
+    this._currentTime = e.target.value * this._duration
+    this.updateCurrentTime(this._currentTime)
+    this.dispatchEvent('seeked', this._currentTime)
+  }
+  _lastChangeVolume = 1
+  volumeInput(e) {
+    this.volume = parseFloat(this._volumeInput.value)
+  }
+  volumeChange(e) {
+    const v = parseFloat(this._volumeInput.value)
+    this.volume = this._lastChangeVolume
+    this.volume = v
+    if (v > 0) {
+      this._lastChangeVolume = v
+    }
+  }
+  formatTime(sec) {
+    const m = Math.floor(sec / 60)
+    const s = ('0'+Math.floor(sec % 60)).slice(-2)
+    return m+':'+s
+  }
+  updateCurrentTime(sec) {
+    this._playedText.textContent = this.formatTime(sec)
+    if (this._duration > 0) {
+      this._progressInput.value = sec / this._duration
+    }
+  }
+  updateTotalTime(dur) {
+    this._durationText.textContent = this.formatTime(dur)
+  }
+
+  eventListeners = {
+    play: [],
+    pause: [],
+    volumeChange: [],
+    seeked: [],
+  }
+  dispatchEvent(eventName, data) {
+    this.eventListeners[eventName].forEach(i => i(data))
+  }
+  addEventListener(eventName, listener) {
+    if (this.eventListeners[eventName] === undefined) {
+      throw new Error('Unsupported event ' + eventName)
+    }
+    this.eventListeners[eventName].push(listener)
+  }
+}
+const bgmCtr = new BgmController(bgm_custom)
+
+bgmCtr.addEventListener('seeked', function (e) {
+  currentTs = Math.round(bgmCtr.currentTime * 1000)
+  if (enableBga) bga.currentTime = bgmCtr.currentTime
+  pause()
+  if (bgmCtr.currentTime < bgmCtr.duration) play()
+})
+bgmCtr.addEventListener('pause', pause)
+bgmCtr.addEventListener('play', play)
+bgmCtr.addEventListener('volumeChange', v => {
+  console.log(v)
+  bgmGain.gain.value = v
+})
 
 //})
