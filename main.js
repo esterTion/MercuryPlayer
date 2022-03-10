@@ -199,10 +199,11 @@ music_select.addEventListener('change', e => {
 
 let bgmBuffer = null
 function setBgm(path) {
+  bgmCtr.duration = 0
   bgmBuffer = null
   fetch(path).then(r => r.arrayBuffer()).then(b => {
     setBgmFromBuffer(b)
-  })
+  }).catch(e => console.error(path, e))
 }
 function setBgmFromBuffer(r) {
   seContext.decodeAudioData(r, buf => {
@@ -1144,7 +1145,8 @@ function updateLaneOnState(fromTs, toTs) {
   while (laneChangeIdx < laneToggleList.length) {
     let i = laneToggleList[laneChangeIdx]
     if (i.timestamp > toTs) break
-    const transitionLength = i.noteWidth * 1000 / 60 / 2
+    const transitionWidth = i.noteWidth / (i.extParam2 === 2 ? 2 : 1)
+    const transitionLength = transitionWidth * 1000 / 60 / 2
     if (i.tickTotal === 0 || toTs - i.timestamp > transitionLength) {
       const value = i.noteType === '12' ? 1 : 0
       const width = i.noteWidth * laneEffectMul
@@ -1159,7 +1161,8 @@ function updateLaneOnState(fromTs, toTs) {
   for (let i_ = 0; i_<pendingLaneChange.length; i_++) {
     const i = pendingLaneChange[i_]
     const value = i.noteType === '12' ? 1 : 0
-    const transitionLength = i.noteWidth * 1000 / 60 / 2
+    const transitionWidth = i.noteWidth / (i.extParam2 === 2 ? 2 : 1)
+    const transitionLength = transitionWidth * 1000 / 60 / 2
     const transitionPercent = Math.min(toTs - i.timestamp, transitionLength) / transitionLength
     const width = i.noteWidth * laneEffectMul
     if (toTs - i.timestamp > transitionLength) {
@@ -1473,7 +1476,6 @@ bgmCtr.addEventListener('seeked', function (e) {
 bgmCtr.addEventListener('pause', pause)
 bgmCtr.addEventListener('play', play)
 bgmCtr.addEventListener('volumeChange', v => {
-  console.log(v)
   bgmGain.gain.value = v
 })
 
