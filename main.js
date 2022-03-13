@@ -169,6 +169,7 @@ function loadUsingSelect() {
   stop()
   const strId = musicTable[id].AssetDirectory
   parseNotesFromFile(`MusicData/${strId}/${strId}_0${diffi}.mer`)
+  bgmFileName = 'MER_BGM_'+strId.replace('-', '_')
   setBgm('Sound/Bgm/output/MER_BGM_'+strId.replace('-', '_')+'.m4a')
 }
 function loadUsingFile() {
@@ -176,6 +177,7 @@ function loadUsingFile() {
     const reader = new FileReader()
     reader.readAsText(music_file.files[0], 'UTF-8')
     reader.onload = e => parseNotesFromText(reader.result)
+    bgmFileName = 'file'
     setBgm(URL.createObjectURL(bgm_file.files[0]))
   } else {
     alert('choose file')
@@ -198,6 +200,7 @@ music_select.addEventListener('change', e => {
 })
 
 let bgmBuffer = null
+let bgmFileName = 'file'
 function setBgm(path) {
   bgmCtr.duration = 0
   bgmBuffer = null
@@ -496,7 +499,7 @@ function parseNotesFromText(text) {noteList = [];
   seRTrigger = Object.keys(noteListForPlayback.filter(i=>['20','21','22','23','24','25','26'].indexOf(i.noteType) !== -1).map(i => i.timestamp).reduce((v,i) => (v[Math.round(i)]=1,v), {})).map(i => parseInt(i)).sort((a,b)=>(a-b))
   seTrigger = Object.keys(noteListForPlayback.filter(i=>['10','12','13','14','sectionSep'].indexOf(i.noteType) === -1).map(i => i.timestamp).reduce((v,i) => (v[Math.round(i)]=1,v), {})).map(i => parseInt(i)).sort((a,b)=>(a-b))
 
-  if (chartHeader.MUSIC_FILE_PATH) {
+  if (bgmFileName !== 'file' && chartHeader.MUSIC_FILE_PATH && chartHeader.MUSIC_FILE_PATH !== bgmFileName) {
     setBgm('Sound/Bgm/output/'+chartHeader.MUSIC_FILE_PATH+'.m4a')
   }
 }
