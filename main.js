@@ -454,7 +454,36 @@ function parseNotesFromText(text) {noteList = [];
     ])
   }
 
-  laneToggleList = noteList.filter(i => (i.noteType === '12' || i.noteType === '13'))
+  laneToggleList = []
+  let laneToggleRawList = noteList.filter(i => (i.noteType === '12' || i.noteType === '13'))
+  laneToggleRawList.forEach(i => {
+    const value = i.noteType === '12' ? 1 : 0
+    const startTime = i.timestamp
+    if (i.extParam2 === 2) {
+      const width = i.noteWidth / 2
+      for (let j=0; j<width; j++) {
+        const stepTime = startTime ? startTime + Math.round(j * 1000 / 60 / 2) : 0
+        if (value === 1) {
+          laneToggleList.push({timestamp: stepTime, value, lane: Math.floor(i.laneOffset + width - 0.5 - j) % 60})
+          laneToggleList.push({timestamp: stepTime, value, lane: Math.floor(i.laneOffset + width + j) % 60})
+        } else {
+          laneToggleList.push({timestamp: stepTime, value, lane: Math.floor(i.laneOffset + j) % 60})
+          laneToggleList.push({timestamp: stepTime, value, lane: Math.floor(i.laneOffset + i.noteWidth - 0.5 - j) % 60})
+        }
+      }
+    } else if (i.extParam2 === 0) {
+      for (let j=0; j<i.noteWidth; j++) {
+        const stepTime = startTime ? startTime + Math.round(j * 1000 / 60 / 2) : 0
+        laneToggleList.push({timestamp: stepTime, value, lane: (i.laneOffset + j) % 60})
+      }
+    } else if (i.extParam2 === 1) {
+      for (let j=0; j<i.noteWidth; j++) {
+        const stepTime = startTime ? startTime + Math.round(j * 1000 / 60 / 2) : 0
+        laneToggleList.push({timestamp: stepTime, value, lane: (i.laneOffset + i.noteWidth - 1 - j) % 60})
+      }
+    }
+  })
+  laneToggleList.sort((a,b) => a.timestamp-b.timestamp)
 
   console.log('parsed notes')
 
@@ -1145,50 +1174,8 @@ function updateLaneOnState(fromTs, toTs) {
   while (laneChangeIdx < laneToggleList.length) {
     let i = laneToggleList[laneChangeIdx]
     if (i.timestamp > toTs) break
-    const transitionWidth = i.noteWidth / (i.extParam2 === 2 ? 2 : 1)
-    const transitionLength = transitionWidth * 1000 / 60 / 2
-    if (i.tickTotal === 0 || toTs - i.timestamp > transitionLength) {
-      const value = i.noteType === '12' ? 1 : 0
-      const width = i.noteWidth * laneEffectMul
-      for (let idx = 0; idx < width; idx++) {
-        laneOnState[(i.laneOffset * laneEffectMul + idx) % (60 * laneEffectMul)] = value
-      }
-    } else if (pendingLaneChange.indexOf(i) === -1) {
-      pendingLaneChange.push(i)
-    }
+    laneOnState[i.lane] = i.value
     laneChangeIdx++
-  }
-  for (let i_ = 0; i_<pendingLaneChange.length; i_++) {
-    const i = pendingLaneChange[i_]
-    const value = i.noteType === '12' ? 1 : 0
-    const transitionWidth = i.noteWidth / (i.extParam2 === 2 ? 2 : 1)
-    const transitionLength = transitionWidth * 1000 / 60 / 2
-    const transitionPercent = Math.min(toTs - i.timestamp, transitionLength) / transitionLength
-    const width = i.noteWidth * laneEffectMul
-    if (toTs - i.timestamp > transitionLength) {
-      for (let idx = 0; idx < width; idx++) {
-        laneOnState[(i.laneOffset * laneEffectMul + idx) % (60 * laneEffectMul)] = value
-      }
-      pendingLaneChange.splice(i_, 1)
-      i_--
-      continue
-    }
-    for (let idx = 0; idx < width; idx++) {
-      let idxCompare = idx + 0.5
-      if (i.extParam2 === 0) {
-        if (idxCompare > width * transitionPercent) continue
-      } else if (i.extParam2 === 1) {
-        if (width - idxCompare > width * transitionPercent) continue
-      } else if (i.extParam2 === 2) {
-        const transitionBorder = width * transitionPercent / 2
-        if (value === 1) {
-          if (Math.abs(width/2 - idxCompare) > transitionBorder) continue
-        } else {
-          if (Math.abs(width/2 - idxCompare) < (width / 2 - transitionBorder)) continue
-        }
-      }
-      laneOnState[(i.laneOffset * laneEffectMul + idx) % (60 * laneEffectMul)] = value
-    }
   }
 }
 
@@ -1199,7 +1186,7 @@ speed_input.addEventListener('input', e => {
   drawForNextFrame = true
 })
 function resize() {
-  const w = Math.round(window.innerWidth * displayRatio), h = Math.round(window.innerHeight * displayRatio)
+  const w = Math.round(window.innerWidth * devicePixelRatio), h = Math.round(window.innerHeight * devicePixelRatio)
   canvas.width = w
   canvas.height = h
   maxR = Math.round(Math.min(w, h) * 0.45)
