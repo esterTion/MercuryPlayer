@@ -40,7 +40,9 @@ let noteList = [];
  * 10: sfl 1
  */
 let controlList = [];
-let noteListForPlayback = [];
+let noteListForPlayback = []
+let bpmList = []
+let metList = []
 let sflTsList = []
 let laneToggleList = []
 let idOffsetMap = []
@@ -52,6 +54,9 @@ let seTrigger = []
 let pendingSeTrigger = []
 let seRTrigger = []
 let pendingSeRTrigger = []
+let seClockTrigger = []
+let pendingSeClockTrigger = []
+let comboInfo = [0,0]
 
 const arrowCanvas = {
   in: document.createElement('canvas'),
@@ -88,8 +93,6 @@ function createArrows() {
   }
 }
 
-const enableBga = false
-
 const TICK_PER_GAME_SECTION = 1920;
 const TICK_PER_BEAT = TICK_PER_GAME_SECTION / 3.8;
 let RENDER_DISTANCE = 750
@@ -100,8 +103,10 @@ let RENDER_DISTANCE = 750
 //parseNotesFromFile('MusicData/S02-218/S02-218_02.mer'); setBgm('music001282.wav')
 //parseNotesFromFile('MusicData/S00-004/S00-004_02.mer'); setBgm('4.wav')
 //parseNotesFromFile('MusicData/S01-055/S01-055_02 (2).mer')
-//const playbackId = 'S01-093'
-//parseNotesFromFile(`MusicData/${playbackId}/${playbackId}_02.mer`); setBgm('Sound/Bgm/output/MER_BGM_'+playbackId.replace('-', '_')+'.m4a')
+setTimeout(function() {
+const playbackId = 'S03-062'
+//parseNotesFromFile(`MusicData/${playbackId}/${playbackId}_03.mer`); setBgm('Sound/Bgm/output/MER_BGM_'+playbackId.replace('-', '_')+'.m4a')
+})
 let musicTable
 function cutText(s) {
   const charRenderSize = s.split('').map(c=> c.match(/[a-zA-Z0-9 ]/)?1:2)
@@ -228,6 +233,8 @@ function parseNotesFromText(text) {noteList = [];
   noteList = []
   controlList = []
   noteListForPlayback = []
+  bpmList = []
+  metList = []
   sflTsList = []
   idOffsetMap = []
   prevIdMap = {}
@@ -236,6 +243,8 @@ function parseNotesFromText(text) {noteList = [];
   holdList = []
   seTrigger = []
   seRTrigger = []
+  seClockTrigger = []
+  comboInfo = [0,0]
   const controlDupFix = {}
 
   const lines = text.trim().replace(/ +/g, '\t').split('\n');
@@ -320,8 +329,8 @@ function parseNotesFromText(text) {noteList = [];
   noteList = noteList.sort((a, b) => a.tickTotal - b.tickTotal)
   let noteNo = 0
   let timeStampOffset = 0;
-  const bpmList = controlList.filter(i => i.cmdType === '2')
-  const metList = controlList.filter(i => i.cmdType === '3')
+  bpmList = controlList.filter(i => i.cmdType === '2')
+  metList = controlList.filter(i => i.cmdType === '3')
   let metOffset = 0
   let TICK_PER_BEAT = TICK_PER_GAME_SECTION / 4
   {
@@ -499,6 +508,21 @@ function parseNotesFromText(text) {noteList = [];
   seRTrigger = Object.keys(noteListForPlayback.filter(i=>['20','21','22','23','24','25','26'].indexOf(i.noteType) !== -1).map(i => i.timestamp).reduce((v,i) => (v[Math.round(i)]=1,v), {})).map(i => parseInt(i)).sort((a,b)=>(a-b))
   seTrigger = Object.keys(noteListForPlayback.filter(i=>['10','12','13','14','sectionSep'].indexOf(i.noteType) === -1).map(i => i.timestamp).reduce((v,i) => (v[Math.round(i)]=1,v), {})).map(i => parseInt(i)).sort((a,b)=>(a-b))
 
+  comboInfo = [
+    noteListForPlayback.filter(i=>['9','10','12','13','14','25','sectionSep'].indexOf(i.noteType) === -1).length,
+    noteListForPlayback.filter(i=>['20','21','22','23','24','25','26'].indexOf(i.noteType) !== -1).length
+  ]
+
+  {
+    sections = noteListForPlayback.filter(i=>i.noteType === 'sectionSep')
+    const start = sections[0].timestamp
+    const beats = metList[0].value1
+    const duration = sections[1].timestamp - start
+    for (let i=0; i<beats; i++) {
+      seClockTrigger.push(start + Math.round(duration / beats * i))
+    }
+  }
+
   if (bgmFileName !== 'file' && chartHeader.MUSIC_FILE_PATH && chartHeader.MUSIC_FILE_PATH !== bgmFileName) {
     setBgm('Sound/Bgm/output/'+chartHeader.MUSIC_FILE_PATH+'.m4a')
   }
@@ -508,7 +532,6 @@ const drawCount = {
   frame: 0,
   actualFrame: 0,
 }
-let currentSectionDiv = stats.parentNode.insertBefore(document.createElement('div'), stats)
 toggle_ui.addEventListener('input', () => {
   document.body.classList[toggle_ui.checked ? 'add' : 'remove']('hide-control')
 })
@@ -516,7 +539,8 @@ toggle_long_audio.addEventListener('input', () => {
   document.body.classList[toggle_long_audio.checked ? 'add' : 'remove']('long-audio')
 })
 setInterval(() => {
-  stats.textContent = [
+  if (stats.childNodes.length == 0) stats.appendChild(document.createTextNode(''))
+  stats.childNodes[0].nodeValue = [
     `frame draw: ${drawCount.frame}`,
     `frame actual draw: ${drawCount.actualFrame}`,
   ].join('\n')
@@ -528,7 +552,6 @@ let startTs = 0
 let startNextFrame = false
 let currentTs = 0
 let currentDistance = 0;
-let currentSection = 0;
 let playing = false;
 let sfl = 1
 let sflOffset = 0
@@ -539,9 +562,18 @@ let chartLength = 0
 let displayRatio = 1
 const laneEffectMul = 1
 const laneOnState = new Uint8Array(60 * laneEffectMul)
+function mainClock(now) {
+  try {
+    render(now)
+    bgmCtr.timerFunc(now)
+  } catch(e) {console.error(e)}
+  requestAnimationFrame(mainClock)
+}
+requestAnimationFrame(mainClock)
 function render(now) {
-  requestAnimationFrame(render)
   drawCount.frame++
+
+  if (!sflTsList.length) return
 
   if (!playing) {
     if (!drawForNextFrame) {
@@ -588,6 +620,7 @@ function render(now) {
 
   let drawDistance = RENDER_DISTANCE
   let previousTs = currentTs
+  let reversing = null
   if (playing) {
     if (startNextFrame) {
       startNextFrame = false
@@ -612,6 +645,7 @@ function render(now) {
     let calcBaseTs = Math.max(currentTs, 0)
     for (let i=0; i<reverseSection.length; i++) {
       if (calcBaseTs > reverseSection[i][0] && calcBaseTs < reverseSection[i][1]) {
+        reversing = reverseSection[i]
         calcBaseTs = reverseSection[i][1] + (reverseSection[i][1] - calcBaseTs) * (reverseSection[i][2] - reverseSection[i][1]) / (reverseSection[i][1] - reverseSection[i][0])
         drawDistance = Math.min(drawDistance, reverseSection[i][2] - calcBaseTs)
         break
@@ -619,11 +653,6 @@ function render(now) {
     }
     currentDistance = (calcBaseTs - sflTsList[sflOffset].timestamp) * sfl + sflTsList[sflOffset].distance
   }
-
-  if (noteListForPlayback.length) {
-    currentSection = (noteListForPlayback.filter(i => i.noteType === 'sectionSep' && i.timestamp <= currentTs).pop()||{section:0}).section
-  }
-  currentSectionDiv.textContent = `current section: ${currentSection}`
 
   updateLaneOnState(previousTs, currentTs)
   // black out "off" lanes
@@ -645,7 +674,7 @@ function render(now) {
     ctx.lineTo(centerX, centerY)
   }
   ctx.fill()
-  const notesToRenderArr = getNotesForDraw(currentDistance, drawDistance).filter(i => i.timestamp >= currentTs)
+  const notesToRenderArr = getNotesForDraw(currentDistance - drawDistance * 0.1, drawDistance * 1.1)
   notesToRender = {
     sectionSep: [],
     touch: [],
@@ -661,7 +690,7 @@ function render(now) {
     laneEffect: [],
     sameTime: [],
     unknown: []
-  }
+  };
   notesToRenderArr.forEach(i => {
     switch (i.noteType) {
       case 'sectionSep': {notesToRender.sectionSep.push(i); break;}
@@ -972,10 +1001,10 @@ function render(now) {
       //ctx.clearRect(0, 0, canvas.width, canvas.height)
       const scale = i.r / maxR
       ctx.fillStyle = i.c
+      ctx.translate(centerX, centerY)
+      ctx.scale(scale, scale)
       i.n.forEach(i => {
         ctx.lineWidth = i.w / 0.8 * 4 * displayRatio
-        ctx.translate(centerX, centerY)
-        ctx.scale(scale, scale)
         ctx.beginPath()
         i.n.forEach(i => {
           ctx.arc(0, 0, maxR * (0.875 + 0.075 * i[0]), i[1], i[1])
@@ -983,8 +1012,8 @@ function render(now) {
         ctx.closePath()
         ctx.fill()
         if (i.w > 0) ctx.stroke()
-        ctx.setTransform(1, 0, 0, 1, 0, 0)
       })
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
 
       //const r = i.r
       //ctx.drawImage(arrowCanvas.flick, 0, 0)
@@ -1009,6 +1038,57 @@ function render(now) {
   }
 
   {
+    ctx.globalCompositeOperation = 'destination-in'
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, maxR, 0, Math.PI * 2)
+    ctx.fillStyle = 'white'
+    ctx.fill()
+    ctx.globalCompositeOperation = 'source-over'
+  }
+
+  if (bpmList.length && metList.length) {
+    const chkTs = Math.round(Math.max(0, currentTs))
+    const bpmItem = (bpmList.filter(v => v.timestamp <= chkTs).slice(-1)[0])
+    const bpm = bpmItem.value1
+    const met = (metList.filter(v => v.timestamp <= chkTs).slice(-1)[0])
+    const refBase = bpmItem.timestamp > met.timestamp ? bpmItem : met
+    const beatDuration = 60000 / bpm * 4 / (met.value2 || 4)
+    const playedNotesCount = [
+      0,
+      0
+    ]
+    for (let i=0; i<noteListForPlayback.length; i++) {
+      if (noteListForPlayback[i].timestamp > chkTs) break
+      playedNotesCount[0] += ['9','10','12','13','14','25','sectionSep'].indexOf(noteListForPlayback[i].noteType) === -1
+      playedNotesCount[1] += ['20','21','22','23','24','25','26'].indexOf(noteListForPlayback[i].noteType) !== -1
+    }
+    const playInfoStat = {
+      min: ''+Math.floor(chkTs / 60000),
+      sec: ('0'+(Math.floor(chkTs / 1000) % 60)).slice(-2),
+      milisec: ('000'+(chkTs % 1000)).slice(-3),
+      section: ('000'+Math.floor((chkTs - refBase.timestamp) / beatDuration / met.value1 + refBase.section)).slice(-3),
+      beat: Math.floor((chkTs - refBase.timestamp) / beatDuration + refBase.tick / (TICK_PER_GAME_SECTION / met.value1)) % met.value1,
+      bpm,
+      sfl
+    }
+    const playInfoText = [
+      `${playedNotesCount[0]} (${playedNotesCount[1]}) / ${comboInfo[0]} (${comboInfo[1]})`,
+      `${playInfoStat.min}:${playInfoStat.sec}.${playInfoStat.milisec} (${playInfoStat.section}/${playInfoStat.beat})`,
+      `BPM: ${playInfoStat.bpm}`,
+      `SFL: ${playInfoStat.sfl}`
+    ]
+    if (reversing) {
+      playInfoText.push('Reversing')
+    }
+    const fontSize = 16 * devicePixelRatio
+    ctx.font = `${fontSize}px Arial`
+    ctx.fillStyle = 'white'
+    for (let i=0; i<playInfoText.length; i++) {
+      ctx.fillText(playInfoText[i], centerX - maxR, centerY - maxR + 10 + fontSize * i)
+    }
+  }
+
+  {
     while (pendingSeTrigger.length && pendingSeTrigger[0] - currentTs < 100) {
       if (!seBuffer) break
       if (pendingSeTrigger[0] - currentTs > -25) {
@@ -1028,6 +1108,16 @@ function render(now) {
         bufSrc.start(seContext.currentTime + Math.max(0, pendingSeRTrigger[0] - currentTs) / 1000)
       }
       pendingSeRTrigger.shift()
+    }
+    while (pendingSeClockTrigger.length && pendingSeClockTrigger[0] - currentTs < 100) {
+      if (!seBuffer) break
+      if (pendingSeClockTrigger[0] - currentTs > -25) {
+        let bufSrc = seContext.createBufferSource()
+        bufSrc.buffer = seBuffer
+        bufSrc.connect(gain)
+        bufSrc.start(seContext.currentTime + Math.max(0, pendingSeClockTrigger[0] - currentTs) / 1000)
+      }
+      pendingSeClockTrigger.shift()
     }
   }
 }
@@ -1057,6 +1147,7 @@ window.play = function () {
   playing = true
   pendingSeTrigger = seTrigger.filter(i => i > currentTs)
   pendingSeRTrigger = seRTrigger.filter(i => i > currentTs)
+  pendingSeClockTrigger = seClockTrigger.filter(i => i > currentTs)
   seContext.resume()
   gain.gain.value = se_volume.value / 100
 }
@@ -1195,11 +1286,11 @@ function resize() {
   maxR = Math.round(Math.min(w, h) * 0.45)
   drawForNextFrame = true
   displayRatio = Math.max(w, h) / 1920
+  const wView = window.innerWidth, hView = window.innerHeight
+  const centerX = wView / 2, centerY = hView / 2
+  const rView = Math.round(Math.min(wView, hView) * 0.45)
 
   if (enableBga) {
-    const wView = window.innerWidth, hView = window.innerHeight
-    const centerX = wView / 2, centerY = hView / 2
-    const rView = Math.round(Math.min(wView, hView) * 0.45)
     bga.style.left = (centerX - rView) + 'px'
     bga.style.top = (centerY - rView) + 'px'
     bga.style.width = (rView * 2) + 'px'
@@ -1208,6 +1299,9 @@ function resize() {
   } else {
     bga.style.display = 'none'
   }
+  
+  play_info.style.left = (centerX - rView) + 'px'
+  play_info.style.top = (centerY - rView) + 'px'
 
   createArrows()
 }
@@ -1271,8 +1365,8 @@ class BgmController {
     e.innerHTML = '<div class="btn"></div><div class="progress"><input type="range" step="any" min="0" max="1" value="0"/></div><div class="duration"><span class="played">0:00</span><span class="duration-grey"> / <span class="total">0:00</span></span></div><div class="volume"></div><div class="volume_slider"><input type="range" step="any" min="0" max="1" value="1"/></div>'
     this._playBtn = e.getElementsByClassName('btn')[0]
     this._progressInput = e.getElementsByClassName('progress')[0].children[0]
-    this._playedText = e.getElementsByClassName('played')[0]
-    this._durationText = e.getElementsByClassName('total')[0]
+    this._playedText = e.getElementsByClassName('played')[0].childNodes[0]
+    this._durationText = e.getElementsByClassName('total')[0].childNodes[0]
     this._volumeBtn = e.getElementsByClassName('volume')[0]
     this._volumeInput = e.getElementsByClassName('volume_slider')[0].children[0]
 
@@ -1354,7 +1448,6 @@ class BgmController {
   timerFunc(now) {
     const elapsed = now - this._lastNow
     this._lastNow = now
-    requestAnimationFrame(this._timerFuncBound)
     if (!this._playing) return
     if (this._duration <= 0) return
     this._currentTime += elapsed / 1000
@@ -1376,9 +1469,7 @@ class BgmController {
     this._volumeInput.addEventListener('input', this.volumeInput.bind(this))
     this._volumeInput.addEventListener('change', this.volumeChange.bind(this))
 
-    this._timerFuncBound = this.timerFunc.bind(this)
     this._lastNow = performance.now()
-    requestAnimationFrame(this._timerFuncBound)
   }
   playBtnClick(e) {
     if (this._playing) { // pause
@@ -1430,13 +1521,13 @@ class BgmController {
     return m+':'+s
   }
   updateCurrentTime(sec) {
-    this._playedText.textContent = this.formatTime(sec)
+    this._playedText.nodeValue = this.formatTime(sec)
     if (this._duration > 0) {
       this._progressInput.value = sec / this._duration
     }
   }
   updateTotalTime(dur) {
-    this._durationText.textContent = this.formatTime(dur)
+    this._durationText.nodeValue = this.formatTime(dur)
   }
 
   eventListeners = {
