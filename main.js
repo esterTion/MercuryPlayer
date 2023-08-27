@@ -62,6 +62,12 @@ const arrowCanvas = {
   in: document.createElement('canvas'),
   out: document.createElement('canvas'),
 }
+function pathToArcPoint(ctx, x, y, r, angle) {
+  ctx.lineTo(
+    x + Math.cos(angle) * r,
+    y + Math.sin(angle) * r,
+  )
+}
 function createArrows() {
   arrowCanvas.in.width = maxR*2, arrowCanvas.in.height = maxR*2
   arrowCanvas.out.width = maxR*2, arrowCanvas.out.height = maxR*2
@@ -75,9 +81,9 @@ function createArrows() {
   ctx.in.translate(maxR, maxR); ctx.in.rotate(Math.PI / 2); ctx.in.translate(-maxR, -maxR)
   for (let i = 0; i < 30; i++) {
     ctx.in.beginPath()
-    ctx.in.arc(maxR, maxR, maxR * 0.9, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
-    ctx.in.arc(maxR, maxR, maxR * 0.8, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
-    ctx.in.arc(maxR, maxR, maxR * 0.9, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
+    pathToArcPoint(ctx.in, maxR, maxR, maxR * 0.9, (i+0.25) * Math.PI / 15)
+    pathToArcPoint(ctx.in, maxR, maxR, maxR * 0.8, (i+0.5) * Math.PI / 15)
+    pathToArcPoint(ctx.in, maxR, maxR, maxR * 0.9, (i+0.75) * Math.PI / 15)
     ctx.in.strokeStyle = 'rgb(200,200,200)'; ctx.in.lineWidth = borderWidth; ctx.in.stroke()
     ctx.in.strokeStyle = 'rgb(203,29,25)'; ctx.in.lineWidth = colorWidth; ctx.in.stroke()
   }
@@ -85,9 +91,9 @@ function createArrows() {
   ctx.out.translate(maxR, maxR); ctx.out.rotate(Math.PI / 2); ctx.out.translate(-maxR, -maxR)
   for (let i = 0; i < 30; i++) {
     ctx.out.beginPath()
-    ctx.out.arc(maxR, maxR, maxR * 0.75, (i+0.25) * Math.PI / 15, (i+0.25) * Math.PI / 15)
-    ctx.out.arc(maxR, maxR, maxR * 0.85, (i+0.5) * Math.PI / 15, (i+0.5) * Math.PI / 15)
-    ctx.out.arc(maxR, maxR, maxR * 0.75, (i+0.75) * Math.PI / 15, (i+0.75) * Math.PI / 15)
+    pathToArcPoint(ctx.out, maxR, maxR, maxR * 0.75, (i+0.25) * Math.PI / 15)
+    pathToArcPoint(ctx.out, maxR, maxR, maxR * 0.85, (i+0.5) * Math.PI / 15)
+    pathToArcPoint(ctx.out, maxR, maxR, maxR * 0.75, (i+0.75) * Math.PI / 15)
     ctx.out.strokeStyle = 'rgb(200,200,200)'; ctx.out.lineWidth = borderWidth; ctx.out.stroke()
     ctx.out.strokeStyle = 'rgb(33,180,251)'; ctx.out.lineWidth = colorWidth; ctx.out.stroke()
   }
@@ -161,6 +167,16 @@ fetch('232.adx.wav').then(r => r.arrayBuffer()).then(r => {
   seContext.decodeAudioData(r, buf => {
     if (buf) {
       seRBuffer = buf
+    } else {
+      console.error('decode failed')
+    }
+  }, e => console.error(e))
+})
+let clkBuffer = null
+fetch('52.hca.wav').then(r => r.arrayBuffer()).then(r => {
+  seContext.decodeAudioData(r, buf => {
+    if (buf) {
+      clkBuffer = buf
     } else {
       console.error('decode failed')
     }
@@ -674,7 +690,7 @@ function render(now) {
     ctx.lineTo(centerX, centerY)
   }
   ctx.fill()
-  const notesToRenderArr = getNotesForDraw(currentDistance - drawDistance * 0.1, drawDistance * 1.1)
+  const notesToRenderArr = getNotesForDraw(currentDistance - drawDistance * 0.1, drawDistance * 1.1).filter(i => i.timestamp > currentTs - 200)
   notesToRender = {
     sectionSep: [],
     touch: [],
@@ -693,7 +709,7 @@ function render(now) {
   };
   notesToRenderArr.forEach(i => {
     switch (i.noteType) {
-      case 'sectionSep': {notesToRender.sectionSep.push(i); break;}
+      case 'sectionSep': {if (i.section) notesToRender.sectionSep.push(i); break;}
       case '1': // touch
       case '2': // bonus touch
       case '20': {notesToRender.touch.push(i); break;} // touch R
@@ -777,11 +793,7 @@ function render(now) {
             Math.PI * (start / 30) + gapWidth, Math.PI * (end / 30) - gapWidth
           )
         } else {
-          ctx.arc(
-            centerX, centerY,
-            r,
-            Math.PI * (end / 30) - gapWidth, Math.PI * (end / 30) - gapWidth
-          )
+          pathToArcPoint(ctx, centerX, centerY, r, Math.PI * (end / 30) - gapWidth)
         }
       }
       for (let i=nodeCount-1; i>=0; i--) {
@@ -796,11 +808,7 @@ function render(now) {
             true
           )
         } else {
-          ctx.arc(
-            centerX, centerY,
-            r,
-            Math.PI * (start / 30) + gapWidth, Math.PI * (start / 30) + gapWidth
-          )
+          pathToArcPoint(ctx, centerX, centerY, r, Math.PI * (start / 30) - gapWidth)
         }
       }
       ctx.closePath()
@@ -1007,7 +1015,7 @@ function render(now) {
         ctx.lineWidth = i.w / 0.8 * 4 * displayRatio
         ctx.beginPath()
         i.n.forEach(i => {
-          ctx.arc(0, 0, maxR * (0.875 + 0.075 * i[0]), i[1], i[1])
+          pathToArcPoint(ctx, 0, 0, maxR * (0.875 + 0.075 * i[0]), i[1])
         })
         ctx.closePath()
         ctx.fill()
@@ -1110,10 +1118,10 @@ function render(now) {
       pendingSeRTrigger.shift()
     }
     while (pendingSeClockTrigger.length && pendingSeClockTrigger[0] - currentTs < 100) {
-      if (!seBuffer) break
+      if (!seBuffer && !clkBuffer) break
       if (pendingSeClockTrigger[0] - currentTs > -25) {
         let bufSrc = seContext.createBufferSource()
-        bufSrc.buffer = seBuffer
+        bufSrc.buffer = clkBuffer != null ? clkBuffer : seBuffer
         bufSrc.connect(gain)
         bufSrc.start(seContext.currentTime + Math.max(0, pendingSeClockTrigger[0] - currentTs) / 1000)
       }
@@ -1122,7 +1130,7 @@ function render(now) {
   }
 }
 let globalPlaybackOffset = 0
-if (/win32/i.test(navigator.platform) && /firefox/i.test(navigator.userAgent)) globalPlaybackOffset = -60
+// if (/win32/i.test(navigator.platform) && /firefox/i.test(navigator.userAgent)) globalPlaybackOffset = -60
 let CALC_CONE_HEIGHT = 6
 let CALC_CONE_RADIUS = 2
 function distanceToRenderRadius (maxR, distance) {
